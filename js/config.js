@@ -6,7 +6,7 @@
    block in `css/base.css` for the two sets and the contrast they are held to. Every consumer drops
    the value into an inline `style` or a `--c`, so the reference works unchanged and the theme swap
    needs no re-render. A **canvas** is the one thing that cannot take a var: the heat layer paints
-   pixels, not CSS, so its gradient keeps real values — see RAIN_HEAT below. */
+   pixels, not CSS, so its classes keep real values — see RAIN_CLASSES below. */
 export const KINDS = {
   river:    { label: 'Water level', color: 'var(--k-river)',    icon: 'water_drop' },
   rainfall: { label: 'Rainfall',    color: 'var(--k-rainfall)', icon: 'rainy' },
@@ -102,21 +102,12 @@ export const RIVER_COLOR = { '-1': 'var(--s-none)', 0: 'var(--k-river)',
 export const RAIN_COLOR  = { '-1': 'var(--s-none)', 0: 'var(--k-rainfall)', 1: 'var(--k-rainfall)',
   2: 'var(--k-rainfall)', 3: 'var(--s-alert)', 4: 'var(--s-danger)' };
 
-/* The same rainfall ramp as real values, for the heat layer's canvas gradient — leaflet.heat builds
-   an ImageData from it, and `var(--k-rainfall)` means nothing to a 2D context. One theme's worth,
-   because a translucent blob is composited over the basemap rather than read against it, and the
-   layer already dims and brightens with what is under it.
-   **THE WASH KEEPS ITS OWN FOUR-RUNG LADDER, and the repository owner settled that on 2026-08-26.**
-   `RAIN_COLOR` above went to three colours that day, so at JPS's heavy class the pin is amber and
-   the blob under it is still violet. That is the decision and not a drift.
-   **A wash paints GROUND and a pin names a SENSOR, and the three-colour rule is about a sensor.**
-   The rule exists because a reader scanning four hundred marks cannot learn a six-ramp code. A wash
-   is one continuous field, and a reader reads it against a legend standing beside it rather than
-   against the mark next to it. So the argument for folding rungs does not reach here.
-   The cost is real and is accepted: at class 3 the two disagree, and only the legend says so.
-   Do not "fix" this by copying `RAIN_COLOR` in. Move `.ramp.rain` in css/chrome.css with it if it
-   ever does move. */
-export const RAIN_HEAT = { 1: '#6f7bff', 2: '#8f7bff', 3: '#c77dff', 4: '#ff4d4d' };
+/* The rain wash's own colours are `RAIN_CLASSES`, far below beside the weights they key on. They are
+   real values, because a canvas cannot resolve `var(--k-rainfall)`. The wash does not take the
+   three-colour rule of `RAIN_COLOR` above, and the owner settled that on 2026-08-26: a wash paints
+   GROUND and a pin names a SENSOR, and the rule is about a sensor. On 2026-11-19 the owner replaced
+   the violet-to-red ramp with blue to purple and no red, so red now means status and nothing else
+   on this map. */
 
 // Which sensor speaks for a mast when several share one: a river gauge says more about a flood than
 // the rainfall gauge strapped to the same pole, and a camera says least until you open it. Used for
@@ -296,25 +287,33 @@ export const LEVEL_FLOOR = 6;
    in heat.js, which splits it into simpleheat's radius and blur rather than handing it to either.
    Water is catchment scale, so one gauge speaks for 5 km of it.
 
-   Rain spreads further because nothing stops it, not because one gauge knows more. A rain reading
-   reaches `RAIN_KM` and stops where another station disagrees. **One number covers both readings.**
-   A gauge reporting rain paints this far and a gauge reporting none erases this far, and where the
-   two meet the boundary is halfway between them — see `SoftHeat` in heat.js. Two numbers stood here
-   first, 9 km of paint against 4 km of erase, and there is no defending that: it is the same
-   instrument, the same minute and the same question, so the answer "none" cannot carry less ground
-   than the answer "12 mm". Symmetry cost 4% of the painted area on the payload it was measured on.
-
-   Measured on 211 gauges over 12 hours of history: given one gauge is wet, the chance its neighbour
-   is wet too runs 24% out to 4 km, halves to 13% by 6 km, and is back to the 5% background rate by
-   12 km. So no rain claim survives 12 km. **This stood at 9 km first, which is the outer edge of a
-   claim that survives rather than the middle of one**, and the same study puts the halving distance
-   at 6. A convective cell over the Klang Valley is 1 to 2 km across, so the shorter number is the
-   one the evidence already carried. `MET_KM` in api.php reasons the same way about a MET point.
-   Moving this moves the erase, the thinning and the blob together, and it changes gauge spacing
-   measured in blob radii — which is what `FEATHER` in heat.js is sized against. Re-run the spacing
-   sweep in CLAUDE.md before and after. */
+   **Rain no longer has a ground size of its own since 2026-11-19.** It was `RAIN_KM`, 6 km, with one
+   disc per gauge, and the constant is gone. The rain wash is an interpolated field, and the three
+   constants below state its distances. The measurement behind them, taken on 211 gauges over 12
+   hours of history: given one gauge is wet, the chance its neighbour is wet too runs 24% out to
+   4 km, halves to 13% by 6 km, and is back to the 5% background rate by 12 km. So no rain claim
+   survives 12 km, and the halving distance is 6. A convective cell over the Klang Valley is 1 to
+   2 km across. `MET_KM` in api.php reasons the same way about a MET point. */
 export const HEAT_KM     = 5;      // water level
-export const RAIN_KM     = 6;      // rainfall, either way it reads
+/* **THE RAIN WASH IS AN INTERPOLATED FIELD, AND THE OWNER DECIDED THAT ON 2026-11-19.** It was one
+   disc of `RAIN_KM` (6 km) around each gauge, with a straight halfway line between a wet gauge and a
+   dry one. The owner showed a weather-model map and asked for a continuous field of narrow bands,
+   and accepted that the app then guesses the rain between gauges. A grid node takes a distance-
+   weighted mean of the weights of every gauge near it, and a dry gauge counts as zero.
+   **The three distances come from the measurement above, which still stands.** Given one gauge is
+   wet, the chance its neighbour is wet too halves by 6 km and is back at the background rate by
+   12 km. So `PRIOR_KM` is 6, the distance at which a lone gauge's value falls to half, and
+   `INTERP_KM` is 12, past which no gauge speaks. A convective cell is 1 to 2 km across, so every
+   estimate between gauges is a guess, and the legend and About say so.
+   `COVER_KM` is 10. Ground farther than that from every live gauge stays bare, because a map that
+   guesses everywhere says nothing about where it is guessing. Certainty is kept out of the colour:
+   the old soft wash put it and the value in one alpha channel, and that was its fault.
+   `RAIN_FLOOR` is half way between a dry gauge (0) and the lightest rain (0.25). The wash exists
+   where the estimate is above it. */
+export const INTERP_KM  = 12;
+export const PRIOR_KM   = 6;
+export const COVER_KM   = 10;
+export const RAIN_FLOOR = 0.125;
 /* Heat weight is a position on the threshold scale, not a fraction of danger. The popup meter's
    piecewise slots (alert 38%, warning 68%, danger 100%) key straight into the gradient, so a blob's
    colour names the band a station crossed. The floor is the alert slot: below its first published
@@ -333,14 +332,58 @@ export const HEAT_MAX_PX = 400;
    moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because
    the *class* is what the reader is told. The millimetres between two classes are not a quantity
    anyone acts on, exactly as the water scale spaces alert/warning/danger rather than metres.
-   The first class starts at 25, not 0, and that is the trick: leaflet.heat uses a point's weight as
-   its alpha, so a scale from zero draws real rain as almost nothing. Light rain is most of the rain
-   most of the time — 10 of 233 gauges reporting, none above 4 mm/h, the day this was written — and
-   an invisible layer is a broken one. The water layer gets this free from its alert-slot floor.
-   Above 60 mm the scale is full, which is right: the class is open-ended.
-   Paired with heat.js's rain gradient (RAIN_HEAT above — the same hues as the rainfall pins, as
-   real values, since a canvas cannot resolve a token) and `.ramp.rain` in chrome.css. */
+   The first class starts at 25, not 0. Before 2026-11-19 a weight was an alpha, so a scale from zero
+   drew real rain as almost nothing, and light rain is most of the rain most of the time. The classed
+   wash no longer reads a weight as an alpha, but the weights stay as they were because every edge in
+   `RAIN_CLASSES` keys on them. Above 60 mm the scale is full, which is right: the class is open-ended.
+   Paired with `RAIN_CLASSES` below and `.ramp.rain` in chrome.css. */
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
+
+/* **THE TWO WASHES ARE CLASSED, AND THE OWNER SETTLED THAT ON 2026-11-19.** Each class draws as one
+   flat colour at its own opacity, with a crisp edge at the reach. It replaced a continuous gradient
+   with a soft rim, which carried the class, the reading and the distance from the gauge in one
+   alpha channel. See `docs/HEATMAP-WHITEPAPER.md` for the research behind the change.
+   A class is `[edge, hex]`. A weight takes the LAST class whose edge it is strictly above, so a
+   reading sitting on an edge stays in the class below it. That matches JPS: moderate is "above 10",
+   which is weight 0.5 here. The edges are the weights `RAIN_STOPS` and `levelStops()` produce, and
+   `0.999` is the open top class, because a full-scale weight is exactly 1.
+   Rain is ColorBrewer BuPu, light to dark, with no warm hue, so red means status and nothing else.
+   Water keeps yellow at alert, orange at warning and red at danger, the same marks the station
+   meter draws.
+   **Rain has thirteen classes and water has five, and the owner asked for both on 2026-11-19.**
+   Every JPS class is split into quarters, and every new colour is the OKLab midpoint of its two
+   neighbours, so the seven colours that stood before stay where they were. The top class is open and
+   cannot split. The edges, in mm an hour: 0, 2.5, 5, 7.5, 10, 15, 20, 25, 30, 37.5, 45, 52.5 and
+   above 60. Water has five: alert, half way to warning, warning, half way to danger and danger. The
+   cost is real: one study read 91.9% correct on four classes and 68.2% on eight. Neighbour bands
+   differ by at least 1.14:1 in luminance on the light theme and 1.08:1 on the dark one, so a band
+   edge is visible and no more. The legend keeps the four JPS words under their own edges, so a
+   reader still finds the class by name.
+      by name. **This is one scale in three places: here, the two `.ramp` rules in css/chrome.css, and
+   the tick words in index.html.** They move together. */
+export const RAIN_CLASSES  = [[0, '#b3cde3'], [0.3125, '#a9bfdc'], [0.375, '#9fb1d5'], [0.4375, '#95a3ce'],
+                              [0.5, '#8c96c6'], [0.5625, '#8c87bf'], [0.625, '#8c77b7'], [0.6875, '#8a67af'],
+                              [0.75, '#8856a7'], [0.8125, '#87489c'], [0.875, '#863991'], [0.9375, '#842886'],
+                              [0.995, '#810f7c']];
+export const WATER_CLASSES = [[0, '#ffd166'], [0.53, '#ffb847'], [HEAT_WARNING, '#ff9f1c'],
+                              [0.84, '#ff7a3d'], [0.999, '#ff4d4d']];
+/* **The rain colours on the dark theme, which are their own set since 2026-11-19.** On a dark ground
+   the light set inverts: light rain read at about 6:1 and very heavy rain at about 1.5:1, so the
+   class that matters most was the one least visible. These keep each light colour's hue, and run in
+   OKLab lightness from 0.50 for the lightest rain to 0.88 for very heavy rain, with a chroma floor so
+   a dark ground does not mute them. Computed contrast against a dark land of #1d2026, composited at
+   75% opacity: 2.1, 2.5, 3.1, 3.7, 4.4, 5.2 and 5.9. The ground colour is assumed, not sampled.
+   Water needs no second set. Its classes already read at 3.3:1 or more on a dark ground.
+   Same edges as `RAIN_CLASSES`. Move the two together, and `.ramp.rain` for the dark theme in
+   css/chrome.css with them. */
+export const RAIN_CLASSES_DARK = [[0, '#38688e'], [0.3125, '#496e9d'], [0.375, '#5873ac'], [0.4375, '#667aba'],
+                                  [0.5, '#7380c8'], [0.5625, '#8c83d1'], [0.625, '#a386db'], [0.6875, '#b58be3'],
+                                  [0.75, '#c790eb'], [0.8125, '#d995f2'], [0.875, '#ec9af8'], [0.9375, '#f5a1fc'],
+                                  [0.995, '#ffa8ff']];
+/* **A class carries a colour and nothing else.** Every class draws at one opacity, and the Settings
+   slider alone sets it. The owner chose that on 2026-11-19, in place of one opacity per class, so
+   that a reader controls how much the wash covers. The slider stops at 80%, which is the owner's cap
+   (`HEAT_OPACITY_MAX` in js/heat.js). */
 
 /* How far a camera may be and still be offered as this station's nearest view. It reached 24 km
    before this cap, which is a different river with different weather over it. 441 of 591 stations

@@ -305,6 +305,17 @@ const isDark = () => document.documentElement.dataset.theme === 'dark';
 map.createPane('labels');
 map.getPane('labels').style.zIndex = 260;
 map.getPane('labels').style.pointerEvents = 'none';
+/* **The heat wash has a pane of its own, under the place names.** Both heat layers put their canvas
+   in Leaflet's `overlayPane` at 400 until 2026-11-19, which covered every name on the map, and the
+   owner asked for the names to read over the wash. 250 is over the ground (200) and under the names
+   (260). The vendored `L.HeatLayer.onAdd()` names `overlayPane`, so `SoftHeat` in js/heat.js
+   overrides it, and `vendor/leaflet-heat.js` stays unpatched. It takes no pointer events, for the
+   reason the names pane states. **No CSS filter may ever reach this pane.** The dark theme inverts
+   the names with one (css/map.css), and the same rule on this pane would invert the wash colours.
+   The borders are drawn into the ground tiles, so they stay under the wash. */
+map.createPane('heat');
+map.getPane('heat').style.zIndex = 250;
+map.getPane('heat').style.pointerEvents = 'none';
 
 /* **THE COVERAGE AREA IS ONE RECTANGLE, AND IT WAS A CIRCLE UNTIL 2026-09-23.** The map used to run
    on forever. A reader could zoom out to the whole world, and the pins then sat on a continent with

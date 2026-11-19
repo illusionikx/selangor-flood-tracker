@@ -1,0 +1,145 @@
+# Crisp classes serve gauge maps better
+
+## Status
+
+This paper is research. It records what the sources say and what the app does. The state below is true on 2026-11-19.
+
+Built, and in the working tree:
+
+- A reading older than one day no longer colors the heatmap or clears color near it.
+- The legend tips state what the code does. The top rain class reads "very heavy".
+- Both washes draw as flat classes with a crisp edge. The rain wash is blue to purple with no red. The owner chose this on 2026-11-19. A class carries a color and no opacity, so the Settings slider is the only opacity control, and it stops at 80%.
+
+Also built: the rain wash is an interpolated estimate between gauges, on the owner's decision of 2026-11-19. Each point takes a distance-weighted mean of the rain gauges within 12 km, a dry gauge counts as zero, and ground more than 10 km from every gauge stays bare. Rain draws in 13 bands, and every edge is a smooth contour, antialiased over one pixel. The dark theme has its own rain colors. The place names draw over the wash.
+
+The owner chose interpolation with knowledge of the research in this paper. The research found no study that compares a blurred field with a crisp one for point gauges, and it found that a storm cell is often smaller than the gap between gauges. The map states that it estimates. The water layer makes no estimate.
+
+Waiting for an owner decision: nothing is open. The work is in the working tree and not committed.
+
+Not built:
+
+- The rain total layer, colored river reaches and the outcome log.
+- Every layer that the Conclusion defers or rejects.
+
+The owner's idea is sound. Remove the feathered edge, and put a classed, crisp fill with a stated reach in its place. No public service in the survey draws a blurred field from gauges alone. Tested readers place a value more accurately on four classes than on a continuous ramp. The present rain wash is better than a stock heatmap, because it blends readings and does not stack them. Its remaining fault is that opacity carries the rain class and the distance from the gauge together. The water-level wash stands on weaker ground, because no source supports a river level spread across a plane. The best new layer is a rain total with a window picker. The payload already holds five windows on 374 of 380 rainfall stations. Six recommendations reverse a decision that the project documents record as settled, and this report names each one. The report proposes work, and it describes no code change as done.
+
+## The wash already blends fairly, but opacity carries two meanings
+
+This section states what the code and the payload hold today. Every fact in it comes from the local audit of 2026-11-19. Both heat layers are one class, `SoftHeat`, which computes a field on a **4 px grid** (`js/heat.js:115`, `144-156`). The class stamps no sprites. Each cell takes a normalized weighted mean of the nearby readings as its value (`js/heat.js:190-199`). Two gauges at 4 mm/h therefore still draw 4 mm/h. The color comes from that value through a 256-step gradient. The alpha is **value x coverage x dry-denial** (`js/heat.js:248-252`). The canvas then takes a default opacity of 75% (`js/heat.js:413-417`). The coverage term holds full strength inside 20% of the radius and reaches zero at the radius (`js/heat.js:99`, `104`). The project documents record the visible rim at 6 km as a fade over 2.35 km (`docs/GOTCHAS.md:2244-2246`).
+
+The rain weight is the JPS class position (`js/config.js:343`). Rain above 0 to 10 mm/h maps to 0.25 to 0.50. Rain above 60 mm/h maps to 1.00. The water weight is the position on the station's own threshold scale. Only a station at or past its alert mark paints (`js/render.js:129-135`). A dry rain gauge erases wash near it and never supplies a value (`js/heat.js:229-247`). The paint distance is 6 km for rain and 5 km for water (`js/config.js:316-317`).
+
+Three faults follow from those facts. These are inferences from the audit, not measured results. First, a low class is a different hue and also a fainter wash. The two channels repeat each other. Light rain at 1 mm/h draws at about 21% opacity at the gauge itself. Second, the rim fade and the class fade use the same channel, so a faint tint has two possible causes. Third, the gradient is continuous, so the map shows tints that no legend tick names.
+
+The audit also found four gaps between what the map says and what the code does. The heat gate does not test reading age (`js/util.js:340-344`). An online station with an old stamp therefore still paints (`js/render.js:128`). The water legend tip says that a flood gauge goes to red at its danger mark (`index.html:1641`). The code sends it to red at `status >= 1` (`js/render.js:125-131`). The audit reads that status as the warning mark. The rain legend tip says that a dry gauge draws nothing (`index.html:1670-1671`). In the code a dry gauge erases wash. At zoom 14 and 15 the 400 px cap makes a blob cover less ground than its legend distance. The rain wash falls to about 13% effective opacity at zoom 15. The audit computed that figure from the formula and did not measure it.
+
+The payload is larger than the project file states. It holds **928 stations**: 380 rainfall, 203 river, 213 siren, 36 flood gauge and 96 camera. On the snapshot, 170 rainfall stations read above zero and 204 read exactly zero. Only 22 rivers stood at or past alert, and 15 flood gauges held water. Rain therefore has far more spatial evidence than water.
+
+## Agencies draw stations, areas and reaches, and each color names an effect
+
+The first question asks how to make the heatmap truly helpful for planning. The survey of public services gives a consistent answer. **No surveyed service** publishes a pure gauge-interpolated rain field. Hong Kong draws isohyets, but it blends more than a hundred gauges with radar. Its method page ([HKO background](https://www.hko.gov.hk/en/wxinfo/rainfall/rf_info.htm)) says that gauge-free ground "makes more reference to the radar rainfall". Hong Kong also prints a caveat on the map page. The page ([HKO isohyet page](https://www.hko.gov.hk/en/wxinfo/rainfall/isohyet_past24hr.shtml)) says the map is not for exact rainfall amounts at specific locations. Australia ([BoM Queensland](https://www.bom.gov.au/qld/flood/)) plots gauge values as points in three windows, by a search summary of its pages.
+
+River state follows one pattern across services. Japan ([JMA flood Kikikuru page](https://www.jma.go.jp/jma/kishou/know/bosai/riskmap_flood.html)) draws flood risk along the river channel, one color per reach. It draws no area wash. The United States ([NWS Des Moines FAQ](https://www.weather.gov/media/dmx/Hydro/DMX_NWPS_WebPageResourcesFAQs.pdf)) colors each gauge by the highest flood category passed. Its National Water Model ([NOAA NWM service](https://maps.water.noaa.gov/server/rest/services/nwm/ana_high_flow_magnitude/FeatureServer)) shows only reaches "with flow at or above high water thresholds". England ([Station 7171](https://check-for-flooding.service.gov.uk/station/7171)) shows a level, a trend word, a state word and a normal range. Singapore ([PUB water level map](https://app.pub.gov.sg/waterlevel/pages/LargeMap.aspx)) colors each drain sensor by percent full in three bands. The United States colors and the Singapore legend both rest on search summaries. The research on method agrees with the practice. One published method ([HESS 24, 293](https://hess.copernicus.org/articles/24/293/2020/hess-24-293-2020.html)) interpolates a level along the channel, between two gauges on one reach. No source in the notes supports interpolation of a level across a plane.
+
+Each service also ties a color to an effect or an action. Hong Kong ([HKO rainstorm warning system](https://www.hko.gov.hk/en/wservice/warning/rainstor.htm)) sets amber, red and black at 30, 50 and 70 mm in an hour. Each signal carries an instruction. The JPS Selangor classes are light 1 to 10, moderate 11 to 30, heavy 31 to 60 and very heavy above 60 mm/h. That table comes from a news explainer ([SAYS](https://says.com/my/news/what-100mm-h-of-rain-mean-areas-are-at-risk-explained)) and not from a JPS document. The app's class edges at 10, 30 and 60 match it.
+
+Reader research supports a classed scale. In one monitor study ([Gilmartin and Shelton, 1990](https://core.ac.uk/download/149235946.pdf)) accuracy fell from **91.9% on four classes to 68.2% on eight**. A second study ([Padilla et al., 2017](https://vdl.sci.utah.edu/publications/2016_infovis_binning/)) found continuous encodings of a 2D field never more accurate than binned ones. That study used one greyscale terrain field, and its authors ask for more work. Public understanding stays low even for a national product. In a JMA survey for fiscal 2019 ([JMA Kumagaya office](https://www.data.jma.go.jp/kumagaya/shosai/chishiki/2019typhoon/ikasiteruka/03_ikasiteruka_kikendo.html)) about 30% of respondents reported that they understood the risk map. Research in the United Kingdom ([Durham study](https://durham-repository.worktribe.com/OutputFile/1354546)) found that people want the timing and the manner of a flood.
+
+These inferences follow for this app. A planning map needs classes that a reader already knows, with a legend in class words and the unit. It needs a stated limit of reach. It needs a time window that fits the decision. One hour answers travel, and 24 hours answers home preparation. It needs a visible difference between measured dry ground and ground that no gauge covers. The agency lesson of one action per color transfers only in part. The project's alert standard sets the response type to Monitor (`docs/FEATURES.md:2271-2274`). It states that the app has no authority to tell anyone to evacuate. The legend can therefore state an effect, and it must not state an instruction.
+
+Color practice creates one conflict with the present ramps. Warning systems own yellow, orange and red. JMA's rain table ([JMA color guideline, 2012](https://www.jma.go.jp/jma/kishou/info/colorguide/120524_hpcolorguide.pdf)) joins a blue rain ramp to its warning colors at 20 mm/h on purpose. The app's rain ramp ends in `#ff4d4d`, a red, for the top class (`js/config.js:119`). The app's own color language reserves red for status. meteoblue ([meteoblue blog](https://www.meteoblue.com/hr/blog/article/show/20902_Improved+satellite+map)) ships a blue-to-violet rain ramp with no warm hue. ColorBrewer BuPu ([scheme data](https://raw.githubusercontent.com/axismaps/colorbrewer/master/colorbrewer_schemes.js)) gives `#b3cde3`, `#8c96c6`, `#8856a7` and `#810f7c` as a candidate for the four wet classes. The choice of that candidate is an inference. The dark theme needs its own values with lightness reversed. CARTO ([Color in Map Design](https://carto.com/help/tutorials/color-in-map-design-part-2)) states that high values must stand out most on a dark ground. No source publishes those dark values.
+
+## Removing the feather is right, and a stated reach must replace it
+
+The second question asks about the owner's idea to remove the feathering. The idea is good, with one condition. The map must still show where a gauge's reach ends and what lies past it.
+
+The evidence against the feather as a value carrier has three parts. First, no surveyed agency draws gauge data as a blur without radar. Second, a smooth ramp from a point invents a gradient. One course text ([Atlas GIS basics](https://atlas.co/courses/gis-basics/heatmaps-and-kde/)) says kernel density in empty areas "produces smooth ramps that suggest declining but real values". That source is course material and not a reviewed paper. Third, the classing studies above favor few flat classes for a reader who must read a value quickly.
+
+The evidence for the feather is real, and this report states it fairly. A review of 44 user studies ([Kinkeldey et al., 2014](https://repos.hcu-hamburg.de/bitstream/hcu/758/1/How%20to%20Assess%20Visual%20Communication%20of%20Uncertainty%20A%20Systematic%20Review%20of%20Geospatial%20Uncertainty%20Visualisation%20User%20Studies.pdf)) ranks fuzziness as the most intuitive sign of uncertainty. The same review reports that a greyscale representation beat blur on response accuracy. The original test ([MacEachren et al., 2012](https://geography.wisc.edu/cartography/projects/publications/MacEachrenEtAl_2012_TVCG.pdf)) used discrete point symbols, and its authors limit the result to those. A hard edge also has a known cost. Studies of the hurricane cone ([Padilla et al., 2017](https://pmc.ncbi.nlm.nih.gov/articles/PMC5626802)) show that readers take a salient border for a real limit. A crisp class edge between two gauges therefore claims a precision that the network lacks.
+
+The two bodies of evidence agree once the channels are separate. Fuzziness helps only where blur means uncertainty and nothing else. In the present wash the fade shares the alpha channel with the class. The inference is to give each fact its own channel. Color states the class, in one flat tone per class. A crisp edge and a legend line state the reach. Words state the uncertainty, as Hong Kong does. Bare ground states that no gauge covers the place.
+
+The reach has a sourced basis. A study of the upper Klang watershed ([Akbari et al., HESSD 2011](https://hess.copernicus.org/preprints/8/9435/2011/hessd-8-9435-2011.pdf)) put a rain gauge's effective influence range at about **6,273 m**. That source is a discussion paper that quotes a 2008 congress paper. A Singapore study ([Mandapaka and Qin, 2013](https://ams.confex.com/ams/93Annual/webprogram/Paper219494.html)) put the hourly e-folding distance of rain at about 9 km. The present `RAIN_KM` of 6 agrees with both figures for a one-hour reading. A conference abstract ([EGU26-4609](https://meetingorganizer.copernicus.org/EGU26/EGU26-4609.html?pdf)) reports that extreme five-minute rain in Singapore halves its correlation in 1.6 km. The 6 km reach is therefore defensible for the hourly figure and too wide for a shorter interval.
+
+Three replacement forms fit the evidence. The table states the claim that each one makes. Every cell is a judgment from the research notes, because no study ranks these forms for gauge data.
+
+| Form | What it claims | Fit with the code today | Main cost |
+|---|---|---|---|
+| Classed field with a crisp edge | "The nearest gauges read this class, inside 6 km" | Keeps `SoftHeat`, the blend, the dry denial and `thinHeat()`. Quantizes the color to four classes and cuts the coverage at one level | Two unlike neighbors still meet through a blended band of middle class |
+| Nearest-gauge cells, clipped at 6 km | "This ground takes its nearest gauge" | A dry gauge owns its half, so the denial pass becomes a midpoint rule | Draws a straight seam between unlike neighbors. Reverses a recorded rule |
+| Classed isobands over an interpolated grid | "The rain field has this shape" | Needs a grid, a contour step and a distance mask | Invents a surface. Reverses the interpolation ban |
+
+The first form is the smallest step, and this report recommends it. It removes the feather and the continuous tints. It keeps every rule that the documents mark "must not". The second form is the more exact statement of what a gauge network knows. Published work ([Rupp et al., 2010](https://shen.sdsu.edu:443/pdf/rupp_ijclim_2010.pdf)) supports its treatment of dry gauges, with a wet or dry decision before any amount. The third form is not valid for a one-hour reading. One hourly comparison ([EGUsphere 2026-1316](https://egusphere.copernicus.org/preprints/2026/egusphere-2026-1316/egusphere-2026-1316.pdf)) finds that advanced interpolation gives "only limited gains over simpler approaches".
+
+Four supports must arrive with the crisp edge, or the map loses information. The legend becomes a stepped strip with 10, 30 and 60 under the joins and the unit stated once. A thin outline in a darker tone of the class gives edge contrast. Practitioners ([W3C WAI-IG list, 2021](https://lists.w3.org/Archives/Public/w3c-wai-ig/2021JanMar/0184.html)) name a border as the simplest repair for thematic maps. A dry gauge needs a quiet mark of its own. Guidance for census maps ([Wazimap NG](https://openup.gitbook.io/wazimap-ng/administration-concepts/zero-values-vs-missing-data)) states that zero and missing must look different. One legend line states the model, for example "Each area shows its nearest gauges, up to 6 km".
+
+Classing exposes a color problem that the feather now hides. The two lowest rain colors are `#6f7bff` and `#8f7bff`, which are close shades of one hue. Opacity separates them today. JMA ([riskmap overview](https://www.jma.go.jp/jma/kishou/know/bosai/riskmap.html)) merged two adjacent purples into one in 2022. The inference is that flat fills in the present colors leave light and moderate rain hard to tell apart. The owner has two ways out. One keeps the four colors and gives each class a fixed opacity step. The other changes the ramp, which reverses the color ruling.
+
+The water-level wash needs a different answer. A level reads against one channel's datum, and the app scores it against that station's own marks. A disc of 5 km around a river gauge claims that the ground near it floods. Only a flood gauge makes a claim about ground, and its claim covers one spot. The practice in Japan, the United States, England and Singapore is a station symbol or a reach line. The app's pins already carry the station's color. The inference is that the water wash adds an area claim and no information. A crisp class edge does not repair that fault. The strongest replacement is a colored reach. The smallest honest one is the pin alone, with a stronger mark.
+
+## Rain totals are the layer worth building, and most others wait
+
+The third question asks which other layers the held data supports. The payload carries `acc` on 374 of 380 rainfall stations (`api.php:4321-4339`). Its windows are 1 hour, 3 hours, today, 24 hours and 72 hours. The 24-hour window answers on 351 stations and the 72-hour window on 353. Each value carries a flag for a derived figure and for a short window. One sample window named 72 hours measured 48.3 hours. The history table keeps 30 days of every series (`api.php:252`).
+
+Published timing supports the short windows. One road-risk study ([UPNM](https://zulfaqarjdset.upnm.edu.my/index.php/zjdset/article/download/160/159/1061)) states that Klang Valley flash floods typically follow heavy rain by two to three hours. The long windows describe a basin flood. In December 2021 the Sentul station ([The Malaysian Insight, 2021](https://www.themalaysianinsight.com/s/357623)) recorded 363 mm in 24 hours. The sources hold no peer-reviewed flash flood threshold in millimeters for the Klang Valley. One hydrologist ([NST, 2020](https://nst.com.my/amp/news/nation/2020/09/624315/kl-cant-handle-more-70mm-says-hydrologist)) said that anything above 50 to 70 mm causes flooding in Kuala Lumpur. That is an expert estimate in a news report.
+
+The table ranks each candidate against the data that the app holds. The verdicts are judgments from the research notes. No user test stands behind the ranking.
+
+| Rank | Layer | Data held today | Verdict |
+|---|---|---|---|
+| 1 | Rain total with a window picker (1 h, 3 h, 24 h, 72 h) | `acc` on 374 stations | Build. Show millimeters with no severity word |
+| 2 | Stale-reading guard on every heat weight | Reading stamp on every station | Build first. It is a gate and not a layer |
+| 3 | Gauge coverage | Station positions | Arrives free with the crisp reach. Bare ground is the layer |
+| 4 | Rain building or easing, and time since rain stopped | Running total in `.history.db` | Defer. A card line serves it better than a wash |
+| 5 | River trend as a mark on the pin | `rate` on 1 of 203 rivers on the snapshot | Defer. Blank on most days |
+| 6 | Rain so far plus rain coming | 3-hour total and MET rungs at 50 points | Defer. The nowcast has no published verification |
+| 7 | Ground wetness from 3-day and 30-day totals | `h72` and a 30-day running total | Defer. The archive on the development machine is thin |
+| 8 | Count of observed signs per district | All five sensor kinds | Defer. Needs district shapes and the alert standard |
+| 9 | Upstream warning by measured lag | Level history | Do not build now. Needs a river order entered by hand |
+| 10 | Basin rain | `basin` on 394 of 928 stations, 118 spellings, no shapes | Do not build |
+| 11 | Return period of the rain | None of the needed coefficients | Do not build |
+| 12 | Rain-to-trigger ratio, hours to danger for all rivers, weighted risk index | Partial | Do not build |
+
+The rain total layer takes one firm design rule from the color research. A window change must rewrite the legend numbers and the unit, from mm/h to mm. The legend title must name the window. The layer must also mark a short window, as the card already does with an asterisk. The total needs a sequential ramp with no status hue, because the documents record no accepted severity scale for accumulation.
+
+The low ranks rest on sourced reasons. Flash flood guidance ratios ([Norbiato et al., 2008](https://hal.archives-ouvertes.fr/insu-00389060)) reach a critical success index of 0.43 with local calibration. Without calibration the best index in United States practice ([Gourley et al.](https://data.zhenzhi.com/details/1/880113921)) was 0.20. A gauge-only copy with one trigger for the whole valley is weaker than both. A weighted index hides its cause. One study ([Barnes, 2006](https://hazards.colorado.edu/archive/awards/paper-competition/Barnes2006.pdf)) found that people who understand the reason for a false alarm stay willing to act. The return period reads as a flood claim. A risk firm ([JBA Risk, 2022](https://www.jbarisk.com/knowledge-hub/event-response/super-typhoon-rai-and-south-east-asia-floods-a-retrospective/)) noted that the return period of the December 2021 flooding itself was unknown. The project documents already reject marks based on design-storm curves (`docs/GOTCHAS.md:284-297`). Only 11 of 230 stations stand on such a gauge.
+
+One inference opens a path to honest thresholds later. The app holds observed outcomes that most studies lack: flood gauge depths and siren activations. A log of the rain totals before each real depth event gives a trigger per place after one monsoon season. That log is the new evidence that the documents require before any threshold returns.
+
+A third layer has a known cost in the interface. One string, `PREFS.heatLayer`, holds the choice, and a new value touches about ten sites in five files. The two-way choices in `syncHeat()` do not scale past three values (`js/heat.js:436-476`). A longer chip label widens a chip row that already wraps at 360 px.
+
+## Six recommendations reverse a recorded decision
+
+The owner asked to see each reversal before the decision. The table lists every recommendation that touches a rule the documents mark settled. The right column states the position of this report.
+
+| Recommendation | Recorded decision it touches | Reversal | Position |
+|---|---|---|---|
+| Quantize the rain color to the four existing class colors | Owner ruling of 2026-08-26, "do not change the heatmap colour" (`docs/GOTCHAS.md:2171-2184`) | Partial. The four values stay. The continuous gradient and the smooth legend ramp go | Recommend. Ask the owner to agree that the ruling permits it |
+| Replace the rain ramp with blue to purple and remove the red top | The same ruling | Full | Recommend as a separate decision, after the classed form is on screen |
+| Cut the coverage to a crisp edge | The rim and join design tuned to station spacing (`docs/GOTCHAS.md:2248-2265`), and `heat-test.html` assertion 7, "the edge is soft" | Full, of a recorded design. The documents do not mark it "must not" | Recommend |
+| Separate opacity from the reading | Convention "A heat layer's weight is its alpha", and the weight floor that follows from it | Full | Recommend, or keep a fixed opacity step per class as a middle course |
+| Nearest-gauge cells | "`cov` must never go back to `max` (Voronoi border)" (`docs/GOTCHAS.md:2220-2241`) | Full | Do not adopt now. Keep as the second prototype |
+| Interpolated isobands for any window | "Do not replace any of this with interpolation" (`docs/GOTCHAS.md:2168-2169`) | Full | Do not adopt for one hour. Defer for 24 and 72 hours |
+| Severity classes on a rain total, such as 60 mm in 3 hours | The rejected accumulation thresholds (`docs/GOTCHAS.md:284-297`) | Full | Do not adopt. Show millimeters alone |
+| River trend or hours to danger in the heat color | The removal of urgency from heat color (`docs/FEATURES.md:2521-2525`) | Full | Do not adopt. A mark on the pin is the only form to consider |
+| Colored river reaches in place of the water wash | "The map draws no water of its own on either theme", and the assertion in `map-limits-test.html` that no river pane returns | Full | Prototype before the owner decides |
+
+Six rows carry a recommendation to adopt or to prototype, and three rows record a reversal that this report rejects. Four recommendations reverse nothing. The stale-reading guard agrees with the rule that `hasInfo()` gates any heat weight. The corrected legend tips state what the code already does. The rain total with a window picker keeps one choice in one string. The legend line about reach adds words and removes none.
+
+## The research left these matters open
+
+No controlled study compares a feathered blob with a crisp disc or a banded field for point measurements. The verdict on feathering therefore rests on agency practice, on classing studies of other map types, and on reasoning. No study ranks interpolation methods at a 5 to 60 minute step in the Klang Valley. The method comparisons that favor kriging use monthly or daily totals.
+
+Several agency facts rest on search summaries and not on a full read. These are the Australian legend, the Singapore drain legend, the United States gauge colors and the WMO guideline. The primary pages refused the fetch. The JPS class table comes from a news site, and nobody read an official JPS legend. The search found no official trigger of 60 mm in one hour for Kuala Lumpur flash floods.
+
+No source gives a tested opacity for a weather overlay, so the 75% default has no outside evidence for or against it. No source gives an age after which a rain reading counts as stale at a five-minute poll. The blend-mode and label-order advice in the color notes has no fetched source. The search found no verification of the MET Malaysia nowcast. It found no travel time between stations for the Klang, Gombak, Langat, Selangor or Bernam rivers.
+
+The local audit also has limits. Nobody ran `heat-test.html`, so its present state is unknown. Nobody read `paint-check.html`, which possibly asserts three rows in the heat menu. The audit did not look at the archive density on the deployed machine. The pixel and opacity figures by zoom are computed and not measured. Two stale comments still state `FEATHER` as 0.75 where the code holds 0.2. The notes on derived layers quote older station counts, and this report uses the counts from the payload.
+
+## Conclusion: three phases, ranked
+
+Phase one is accuracy with no reversal, and it comes first. Add reading age to the heat gate. Correct the two legend tips. Rename the top rain tick from "violent" to the JPS term "very heavy". Add the legend line that states the reach. Phase one then asks the owner for the first three decisions in the reversal table. They are four flat classes, a crisp edge, and opacity that no longer follows the reading. A prototype of the classed crisp field beside the present wash lets the owner decide on the map itself. The prototype needs both themes, at 1536 px and at 360 px. The assertions in `heat-test.html` about a soft edge and a blend need new probes before any such change ships.
+
+Phase two builds on the owner's answers. Build the rain total layer with the window picker, in millimeters, on a ramp with no status hue. Decide the blue-to-purple ramp for the hourly layer with both forms on screen. Prototype colored reaches against the present water wash, and decide which of the two the map keeps. Start the outcome log of flood gauge and siren events. One monsoon season of evidence then exists by the next review.
+
+Phase three waits for that evidence. It holds the trend marks, the nowcast combination, ground wetness and the count of signs per district. Each one goes through the alert design standard first. Five things stay unbuilt: the return period, the trigger ratio, hours to danger for every river, the weighted index and any slope layer. The research changes one assumption behind the whole revamp. The map gains more from a smaller claim, drawn exactly, than from a smoother picture of rain that the gauges did not measure.

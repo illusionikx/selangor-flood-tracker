@@ -507,9 +507,11 @@ printf("rows: %d, points: %d, newest: %s\n",
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1800,1000 --dump-dom \
   https://flood-exp.test/title-test.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
-# How far apart the stations stand, in blob radii. **Both heat layers, because FEATHER (0.20) is one
-# module constant and governs both.** It is not a rain setting. Re-run this before moving it, before
-# moving RAIN_KM or HEAT_KM, and before moving the join assertions in heat-test.html.
+# How far apart the stations stand, in blob radii. **The water layer alone since 2026-11-19.** The rain
+# layer is an interpolated field and has no blob and no spacing, so its row and `RAIN_KM` are gone.
+# Water is the one layer left on the reach form, and `GATE` (0.20, once `FEATHER`) is its constant.
+# Re-run this before moving GATE or HEAT_KM, and before moving the join assertions in heat-test.html.
+# The text below still describes two rows. Read it as history for the rain row.
 # The two rows should stay close to each other. Measured 2026-08-14 they are near identical —
 # rainfall at 6 km reads 1.21/1.66/1.95 and water at 5 km reads 1.18/1.68/1.99 — so one FEATHER
 # fits both. That is not luck: each radius was picked for its own network's density, so the ratio
@@ -525,9 +527,9 @@ printf("rows: %d, points: %d, newest: %s\n",
 # 1.13/1.48/1.96 — a SHORTER radius keeps stations relatively FURTHER apart, the opposite of the
 # intuition.
 php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
-preg_match("/RAIN_KM\s*=\s*([\d.]+)/",$c,$m);preg_match("/HEAT_KM\s*=\s*([\d.]+)/",$c,$m2);
+preg_match("/HEAT_KM\s*=\s*([\d.]+)/",$c,$m2);
 $km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
-foreach(["rainfall"=>[["rainfall"],(float)$m[1]],"water"=>[["river","gauge"],(float)$m2[1]]] as $nm=>[$kinds,$R]){
+foreach(["water"=>[["river","gauge"],(float)$m2[1]]] as $nm=>[$kinds,$R]){
 $all=array_values(array_filter($p["stations"],fn($s)=>in_array($s["kind"],$kinds)&&$s["lat"]));
 $k=[];foreach($all as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
 $nn=[];foreach($k as $i=>$a){$n=1e9;foreach($k as $j=>$b) if($i!=$j) $n=min($n,$km($a["lat"],$a["lng"],$b["lat"],$b["lng"]));
@@ -539,36 +541,26 @@ printf("%-9s @%.0fkm: %d stations -> %d kept\n",$nm,$R,count($all),count($k));
 printf("  nearest neighbour : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($nn),$q($nn,.5),$q($nn,.9),end($nn));
 printf("  all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($ap),$q($ap,.5),$q($ap,.9),end($ap));}'
 
-# How much ground the rain layer claims, and how many gauges reporting no rain are left under it.
-# This is the sweep that found the 1.8x paint bug: the wash covered 2,747 km2 with 58 dry gauges
-# under it. It is a PHP replica of `_field()`, so RAIN_KM and FEATHER are read out of the source and
-# never copied here. Expect about 77% of the reach kept, and at most a handful of dry gauges left
-# under paint — those share a pole with a wet gauge, where the gate protects the wet reading.
-# A dry count in the dozens means the denial stopped running. A kept figure near 96% means the
-# per-pixel gate has been replaced by a per-gauge radius again, which under-denies by two thirds.
-php -r '$p=json_decode(file_get_contents(".cache.json"),true);
-preg_match("/RAIN_KM\s*=\s*([\d.]+)/",file_get_contents("js/config.js"),$m);$R=(float)$m[1];
-preg_match("/FEATHER\s*=\s*([\d.]+)/",file_get_contents("js/heat.js"),$m2);$F=(float)$m2[1];
-$km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
-$ramp=fn($t,$k)=>1-(($t-$k)/(1-$k))**2*(3-2*($t-$k)/(1-$k));
-$ker=fn($t)=>$t>=1?0:($t>$F?$ramp($t,$F):1);
-$all=array_values(array_filter($p["stations"],fn($s)=>$s["kind"]==="rainfall"&&$s["lat"]));
-$wet=array_values(array_filter($all,fn($s)=>($s["hourly"]??0)>0));
-$dry=array_values(array_filter($all,fn($s)=>($s["hourly"]??null)!==null&&$s["hourly"]<=0));
-usort($wet,fn($a,$b)=>$b["hourly"]<=>$a["hourly"]);
-$k=[];foreach($wet as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
-$cell=function($y,$x)use($k,$dry,$km,$R,$ker){$cs=0;$wn=0;$dsum=0;$dn=0;
- foreach($k as $s){$d=$km($y,$x,$s["lat"],$s["lng"]);if($d>=$R)continue;$c=$ker($d/$R);$cs+=$c;$wn+=$c/($d*$d+0.01);}
- foreach($dry as $s){$d=$km($y,$x,$s["lat"],$s["lng"]);if($d>=$R)continue;$c=$ker($d/$R);$dsum+=$c;$dn+=$c/($d*$d+0.01);}
- $cov=1-(1-min(1,$cs))**2; $dcov=1-(1-min(1,$dsum))**2;
- return [$cov, $dn?1-$dcov*($dn/($wn+$dn)):1];};
-$st=0.4;$dg=$st/111;$la=array_column($k,"lat");$ln=array_column($k,"lng");$full=0;$lit=0;
-for($y=min($la)-0.1;$y<=max($la)+0.1;$y+=$dg){$dx=$dg/cos(deg2rad($y));
-for($x=min($ln)-0.1;$x<=max($ln)+0.1;$x+=$dx){[$cov,$keep]=$cell($y,$x);
- if($cov<0.25)continue; $full+=$st*$st; if($cov*$keep>=0.25)$lit+=$st*$st;}}
-$on=0;foreach($dry as $d){[$cov,$keep]=$cell($d["lat"],$d["lng"]); if($cov*$keep>=0.25)$on++;}
-printf("%d wet -> %d blobs, %d dry. reach %.0f km2, violet %.0f km2 (%d%% kept), %d of %d dry under\n",
-count($wet),count($k),count($dry),$full,$lit,round(100*$lit/max(1,$full)),$on,count($dry));'
+# What the rain estimate is built from, and how much of the map it paints. The rain wash is an
+# interpolated field since 2026-11-19, so the old PHP replica of the reach form is gone. It answered
+# how much ground one disc per gauge claimed, and no disc exists now. Two numbers say what the
+# estimate has to work with. The first is how many rain gauges report, wet and dry, and how many of
+# them are fresh enough to count. A wet count near zero means the wash is nearly bare, and that is
+# the data and not a fault. A dry count near zero means `heatOk()` is dropping stations it should
+# keep. Expect about a tenth of the gauges wet on an ordinary day.
+php -r '$p=json_decode(file_get_contents(".cache.json"),true);$w=0;$d=0;$s=0;
+foreach($p["stations"] as $x){ if($x["kind"]!=="rainfall"||!$x["lat"]||!($x["online"]??false)) continue;
+ $h=$x["hourly"]??null; if($h===null) continue;
+ if(preg_match("#^(\d\d)/(\d\d)/(\d{4}) (\d\d):(\d\d)#",$x["updated"]??"",$m) && time()-mktime($m[4],$m[5],0,$m[2],$m[1],$m[3])>86400){$s++;continue;}
+ $h>0?$w++:$d++; }
+printf("%d wet, %d dry, %d stale and left out\n",$w,$d,$s);'
+# The second is the share of the canvas the wash paints, read from the browser. Open the app with the
+# Rainfall layer on, set zoom 10, and run this in the console. A fully dry day reads 0, and test mode
+# reads about 25%. A value that does not move when the gauges change means the layer stopped
+# redrawing. Cover limit and gauge count move it, and `COVER_KM` is the one to suspect.
+#   const {rainHeat}=await import('/js/heat.js'),c=rainHeat._canvas,
+#   d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+#   let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;console.log((n/(c.width*c.height)).toFixed(3))
 
 # Which notices survive the filter, and where each one came from. `kind` names a flood alert or a
 # weather warning. `src` names which of the two MET sources answered, or `jps` for the flood alert.

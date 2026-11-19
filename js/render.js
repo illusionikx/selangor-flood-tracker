@@ -1,9 +1,10 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
+import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, tier, doubted, faultWhy } from './util.js';
+         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, tier, doubted, faultWhy,
+         heatOk } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
 import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
@@ -125,7 +126,7 @@ export function render() {
     // A tripped gauge goes straight to full red regardless of depth. Its warning mark is 15 cm: a
     // gauge that has crossed it is reporting water standing over a spot known to flood, which is an
     // observation, not a forecast, and it outranks anything a scale could say about the centimetres.
-    const near = !hasInfo(s) ? 0
+    const near = !heatOk(s) ? 0
       : s.kind === 'river' ? (levelStops(s) ? scalePos(s.level, levelStops(s)) / 100 : 0)
       : s.kind === 'gauge' && s.depth > 0
         ? (s.status >= 1 && !doubted(s) ? 1 : scalePos(s.depth, gaugeStops(s)) / 100)
@@ -145,7 +146,7 @@ export function render() {
        station's own total denies the reading, so it cannot paint. It must not erase either. A
        reading nobody can stand behind is no evidence that the ground under it is dry.
        See `rainBacked()` in api.php and `raining()` in util.js. */
-    if (s.kind === 'rainfall' && hasInfo(s) && !doubted(s))
+    if (s.kind === 'rainfall' && heatOk(s) && !doubted(s))
       s.hourly > 0 ? rainPoints.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100])
                    : dryPoints.push([s.lat, s.lng]);
 
@@ -262,14 +263,15 @@ export function render() {
   markSel(side.key);
 
   syncCluster();
-  // Thinned, not raw: overlapping blobs composite, and these are intensities rather than counts.
-  // Each at the distance its own layer paints, or the thinning and the paint disagree.
+  // Water is thinned, not raw: overlapping blobs composite, and these are intensities rather than
+  // counts. It is thinned at the distance it paints, or the thinning and the paint disagree.
   heat.setLatLngs(thinHeat(points, HEAT_KM));
-  // Both setters ask for a redraw and leaflet.heat coalesces the pair into one frame, so the order
-  // is for a reader rather than for the canvas: the evidence against goes in beside the evidence
-  // for, and neither call is the one that draws.
+  // Rain is not thinned. Its wash is a normalised mean of every gauge near a node, which cannot
+  // stack, and thinning would throw away a reading the estimate is built from. Both setters ask for
+  // a redraw and leaflet.heat coalesces the pair into one frame, so the order is for a reader: the
+  // dry gauges are evidence too, and they enter as the value zero.
   rainHeat.setDry(dryPoints);
-  rainHeat.setLatLngs(thinHeat(rainPoints, RAIN_KM));
+  rainHeat.setLatLngs(rainPoints);
   /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it. The
      flashTo() helper moves `PREFS.mapLayer` back to `'stations'`. It calls state.rerender() on every
      jump to a station. The old check here read the preference alone, and that had already moved by

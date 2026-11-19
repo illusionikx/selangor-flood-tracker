@@ -2114,7 +2114,15 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   read a dry flood gauge as proof that the rain layer overclaims. Good drainage is the
   whole reason it is not. The siren already obeys the same rule from the other side. Flood gauges are not backing
   evidence there either.
-- **A rain gauge reporting zero is a reading, and the rain heat layer draws it.** The network says
+- **A rain gauge reporting zero is a reading, and the rain heat layer draws it.**
+  **Reversed on 2026-11-19, by the owner's decision of an interpolated rain wash.** A dry gauge now
+  SUPPLIES a value: it enters the weighted mean as zero, so the estimate falls toward it and a hole
+  opens round it. "A dry gauge can deny ground, never supply a value" and "Do not replace any of this
+  with interpolation" no longer hold for the rain layer. `RAIN_KM`, the eraser, the halfway rule and
+  the one number for paint and erase are gone with the reach form, and the rain layer is no longer
+  thinned. The water layer keeps the reach form and its rules. The body below describes the reach
+  form and is kept as history. The part that still holds: a flood gauge is never rain evidence, in
+  either direction, and a reading older than one day feeds nothing. The network says
   two things: 12 gauges reporting rain and 218 reporting none, on the payload this was built from.
   The layer used to draw only the first. So the wash covered ground that 218 stations had
   already measured and found dry. `SoftHeat` in `js/heat.js` runs the second pass for this reason. It
@@ -2168,7 +2176,57 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   replace any of this with interpolation. A dry gauge can deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
-- **NEITHER HEAT WASH FOLLOWS THE THREE-COLOUR RULE, AND THAT IS SETTLED.** The repository owner
+- **THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.** `SoftHeat._interp()` in
+  `js/heat.js` takes a distance-weighted mean of the CLASS POSITION of every gauge within 12 km, wet
+  and dry. **The prior is a constant weight on the value 0, and without it a lone wet gauge paints a
+  flat disc.** A mean of one value is that value. With the prior the value falls to half at 6 km
+  (`PRIOR_KM`), so a lone gauge draws a hill. **Interpolate the position, never the millimetres.**
+  Rain is skewed, and one 60 mm gauge would carry high values far out. **The put-back near a gauge
+  is what keeps a very heavy reading very heavy.** The blur that removes the ring target round each
+  gauge also lowers its peak, and the nearest grid node sits up to 5.7 px off. So within 1.5 cells of
+  a gauge the field is pulled to that gauge's own reading. **The top class edge is 0.995 and not
+  0.999**, because the estimate reaches 1 only at a gauge. **There is no 400 px cap and no fade on
+  this layer.** The cap protected a blob whose cost grew with its radius, and this cost is the number
+  of gauges within the reach. **The grid cell is a twelfth of the reach, 8 to 16 px.** At zoom 11 a
+  fixed 8 px took 91 ms on the 325-gauge test payload. **Ground past `COVER_KM` (10 km) from every
+  gauge is bare**, and certainty stays out of the colour: the old soft wash put it and the value in
+  one alpha channel. `heat-test.html` asserts a gauge keeps its class, a lone gauge falls with
+  distance and ends at the cover limit, a dry gauge is bare, two gauges 50 m apart leave no hole and
+  all-dry paints nothing.
+- **THE WASH EDGE IS A CONTOUR OF A FIELD, AND FOUR THINGS BREAK IT SILENTLY.** `SoftHeat._field()`
+  in `js/heat.js` samples fields on an 8 px grid and `regionPath()` draws the positive part of each
+  as one path. **One path, never one per cell.** Two abutting antialiased fills leave a hairline
+  seam, and one path with one winding is rasterized as a whole. **A node outside the reach holds
+  the reading of the nearest wet gauge, and its true reach margin.** A small value there drags the
+  edge between it and the node inside toward the inside node, and a missing reading made the
+  smoothed ground take the top class. **The bucket index is `r` plus 3 sigma plus two cells.** With
+  less, a node just outside the reach found no gauge and the edge landed up to a cell inward. **The
+  `_redraw()` guard reads `this._heat`.** It once read `this._heat._grad`, which only exists when a
+  layer sets a `gradient`, and the wash painted nothing with no error. `heat-test.html` asserts the
+  reach as a circle within 1.5 px, the halfway line within 1.5 px, a rim with at most two partial
+  pixels and a class edge that is one smooth curve. Do not raise the grid cost back to 4 px without
+  re-timing: 4 px took 138 ms at zoom 12 and 8 px takes 28.
+- **THE WASH SHAPE IS SMOOTHED BY BLURRING ITS FIELD, NEVER ITS PICTURE.** `smoothGrid()` blurs `F0`
+  before tracing, `SMOOTH` is a tenth of the reach, and the blur scales with the reach so a small
+  reach at low zoom is not eaten. **Never blur the picture.** That is feathering, and the owner removed
+  it. **Never blur the class fields a second time.** A class region could then spill past the wash at a
+  notch, where the blur grows the shape. **The distance field must stay true out to 3 sigma beyond the
+  reach.** Clamped at 8 px past it, a 16 px sigma pushed a straight edge out by 3 px. **Never
+  `min()` two fields to add a hard corner back.** The notch test allows a fill of `SMOOTH * r`, no more.
+- **THE WASH HAS A PANE OF ITS OWN AT 250, AND NO FILTER MAY REACH IT.** The canvas sat in
+  `overlayPane` at 400 until 2026-11-19 and covered every place name. The `heat` pane in `js/map.js`
+  sits over the ground (200) and under the names (260). The dark theme inverts the NAMES with a CSS
+  filter (`css/map.css`), and the same rule on the heat pane would invert the wash colours.
+  `SoftHeat` overrides `onAdd()` and `onRemove()`, and `vendor/leaflet-heat.js` stays unpatched.
+  `map-limits-test.html` asserts the order and `filter: none`.
+- **NEITHER HEAT WASH FOLLOWS THE THREE-COLOUR RULE, AND THAT IS SETTLED.**
+  **Changed on 2026-11-19, and the owner decided it.** The rule itself stands: a wash paints ground
+  and does not take the three-colour rule. What moved is the ramp. The rain wash now draws four flat
+  classes, blue to purple with no red (`RAIN_CLASSES` in `js/config.js`), so red means status and
+  nothing else on this map. The water wash keeps yellow, orange and red as three flat classes
+  (`WATER_CLASSES`). The two `#legend .ramp` rules are hard-stop gradients of those classes. The
+  rest of this entry describes the gradients that stood until that date, and it is kept as history.
+  The repository owner
   ruled on 2026-08-26, when the rule reached every other surface that draws a reading. Four things
   keep the old four-rung ladder: the two gradients in `js/heat.js` and the two `#legend .ramp` rules
   in `css/chrome.css` that describe them.
@@ -2182,7 +2240,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   **Do not "fix" this by copying `RIVER_COLOR` or `RAIN_COLOR` into a gradient.** Anything that moves
   a gradient moves its ramp in the same change. `RAIN_HEAT`'s own comment in `js/config.js` holds the
   argument once, and every other site points at it.
-- **A heat blob's alpha is its colour as well as its size.** So the brush's own falloff walks down
+- **A heat blob's alpha is its colour as well as its size.**
+  **Reversed on 2026-11-19, by the owner's choice of a classed wash.** A class is one flat colour
+  and no cell carries an alpha of its own, so `_field()` reads no colour table and the old trap
+  cannot occur. The rules that stand: never stamp blobs and composite them, never erase with
+  `destination-out`, never fill a radial gradient as a square. The `heat` and `rainHeat` layers set
+  `classes` and no `gradient`. The body below describes the soft wash and is kept as history. So the
+  brush's own falloff walks down
   the legend. simpleheat's `_colorize()` looks the gradient up by alpha. The stock brush fades
   across most of a blob. So one rain gauge reading 27 mm/h, JPS's *heavy* class, painted heavy at
   the gauge. It painted moderate 4 km out and light 6 km out. That is three classes from one number, with a
@@ -2219,7 +2283,7 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `CELL` and the edges go blocky. Lower it and the cost climbs with the square.
   **`cov` is a union, and it must never go back to a max — that is a Voronoi border.** A cell asks
   two questions and one curve cannot answer both. So `BLEND` (0.45) sizes each reading's say in the
-  mean and `FEATHER` (0.75) sizes the coverage. One curve served both at first, joined by `max`, and
+  mean and `FEATHER` (0.2) sizes the coverage. One curve served both at first, joined by `max`, and
   that failed twice over. `max` follows whichever gauge is nearer, so its slope flips sign on the
   equidistant locus, which is the Voronoi edge. A sign flip is a crease, and the eye reads a crease
   as a line. The blend weight is also down to 0.30 at 0.8 of a radius. That is right for a weight and
@@ -2230,7 +2294,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   The replacement is a **clamped sum**, and it cannot pass 1. So an overlap still never paints
   brighter than a gauge centre. After it, 179 flat at 1.13 and 1.48 radii, and the unequal pair
   walks 242 → 149 → 89.
-- **A rim facing empty ground and a join between two blobs are different edges.** Only the combine
+- **A rim facing empty ground and a join between two blobs are different edges.**
+  **Reversed on 2026-11-19, by the owner's choice of a crisp wash.** There is no soft rim and no
+  `cov`. A cell is on the wash if any gauge reaches it, and the wash ends where the reach ends. The
+  `FEATHER` constant is now `GATE` in `js/heat.js` and sizes only the weight a gauge has when a wet
+  and a dry gauge argue over a cell. A join at any spacing inside the reach is solid, and
+  `heat-test.html` asserts that at 1.21 r and 1.66 r. The measurements below describe the soft rim
+  and are kept as history. Only the combine
   can tell them apart. `FEATHER` is one radial curve, so lowering it to soften the rim hollows out
   every join by the same amount. Measured, 0.75 to 0.50 under a union took the share of solid joins
   from 84% to 45%. The combine sees something the curve cannot: how many readings arrive. A rim has

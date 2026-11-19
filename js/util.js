@@ -343,6 +343,13 @@ export const isStale = s => {
   return !!when && Date.now() - when > 864e5;
 };
 
+/* **The one gate every heat weight passes, wet side and dry side alike.** `hasInfo()` alone let an
+   online station through whose stamp was days old, so a frozen reading kept painting, and a frozen
+   zero kept erasing ground a newer gauge might call wet. A reading older than a day colours nothing
+   and denies nothing. It is `hasInfo()` plus `isStale()`, and the two stay separate on purpose:
+   every other surface still wants `hasInfo()` alone. */
+export const heatOk = s => hasInfo(s) && !isStale(s);
+
 /* The three things we currently call "an alert", separated.
  *
  * CAP splits certainty from urgency, and lumping them is the failure ISA-18.2 names: when every

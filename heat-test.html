@@ -2,12 +2,15 @@
 <meta charset="utf-8">
 <title>Rain heat layer check</title>
 <!-- Third runnable check in this repo, beside shots-test.php and `php api.php --selftest`.
-     It guards the two rules the rainfall heat layer is built on, and both of them live in canvas
-     pixels, where nothing else here can reach them. Reading the code proves neither.
+     It guards the rules the rainfall heat layer is built on, and all of them live in canvas
+     pixels, where nothing else here can reach them. Reading the code proves none.
 
-       1. A blob paints RAIN_KM of ground. simpleheat stamps a sprite of `radius + blur`, so the
-          pair has to sum to that distance rather than either one carrying it.
-       2. A gauge reporting no rain erases the paint over itself, and only near itself.
+       1. The water layer's gauge paints HEAT_KM of ground, and the wash ends there with a crisp edge.
+          Its engine is the reach form, and every shape rule below is asserted on it.
+       2. A class is one flat colour. Nothing between two gauges takes a colour the legend lacks.
+       3. The rain layer is an interpolated estimate. A gauge keeps its own class, a lone gauge draws
+          a hill, a dry gauge counts as zero, and the wash ends at the cover limit.
+       4. A stale reading feeds nothing. The Settings opacity stops at 80%.
 
      Run it headless. It prints its own verdict into the output box below, so there is nothing to
      look at. CLAUDE.md's Verify block carries the command. Do not write that element's own tag
@@ -44,33 +47,30 @@ const ok = (name, pass, detail) => { say((pass ? 'ok   ' : 'FAIL ') + name + '  
                                      if (!pass) fails.push(name); };
 try {
   const { map } = await import('./js/map.js');
-  const { rainHeat } = await import('./js/heat.js');
-  const { RAIN_KM } = await import('./js/config.js');
+  const { heat, rainHeat, classOf, heatOpacity, HEAT_OPACITY_MAX } = await import('./js/heat.js');
+  const { HEAT_KM, RAIN_CLASSES, WATER_CLASSES, RAIN_STOPS } = await import('./js/config.js');
+  const { scalePos } = await import('./js/util.js');
+  const { PREFS } = await import('./js/state.js');
+  // The class colours, as the bare hex the pixel reader returns.
+  const HUES = WATER_CLASSES.map(c => c[1].slice(1));   // the reach-form tests below run on the water layer
 
   // One gauge reporting rain, and one reporting none, a quarter of the reach to the east. Close
-  // enough that an eraser of the full RAIN_KM would reach across the wet gauge and thin it.
-  const WET = [3.16, 101.75], GAP = RAIN_KM / 4;
+  // enough that an eraser of the full HEAT_KM would reach across the wet gauge and thin it.
+  const WET = [3.16, 101.75], GAP = HEAT_KM / 4;
   const east = d => [WET[0], WET[1] + d / (111 * Math.cos(WET[0] * Math.PI / 180))];
   const DRY = east(GAP), MIRROR = east(-GAP), MID = east(GAP / 2);
-  // Half a blob out, inside the part that holds full strength. And 92% out, deep in the soft halo.
-  // Both on the side no dry gauge touches. **The halo is the outer quarter of the radius, not the
-  // outer half** — coverage holds full strength to FEATHER (0.75), so a probe at 80% lands on the
-  // flat part and reports a hard edge that is not there. And a point the eraser has taken about
-  // half of, to read the colour off a boundary rather than off a body.
-  /* And a point the denial has taken about half of, to read the colour off a boundary rather than
-     off a body. **It sits nearer the wet gauge than the dry one**, at 0.45 of the gap. The denial
-     reaches its full radius now rather than stopping at the midpoint, so three quarters of the way
-     across leaves only alpha 22 — partially erased on a technicality, and no use for reading a hue
-     off. */
-  const HALF = east(-RAIN_KM / 2), OUTER = east(-RAIN_KM * 0.92), FADE = east(GAP * 0.45);
+  // Half a blob out, and 92% out, near the rim. Both on the side no dry gauge touches. And one point
+  // on each side of the halfway line between the wet gauge and the dry one.
+  const HALF = east(-HEAT_KM / 2), OUTER = east(-HEAT_KM * 0.92);
+  const WETSIDE = east(GAP * 0.3), DRYSIDE = east(GAP * 0.7);
 
   // An animated setView is asynchronous and this page is not. Every read below is synchronous.
   map.setView(WET, 12, { animate: false });
-  rainHeat.addTo(map);
-  rainHeat.setDry([DRY]);
-  rainHeat.setLatLngs([[...WET, 0.9]]);
+  heat.addTo(map);
+  heat.setDry([DRY]);
+  heat.setLatLngs([[...WET, 0.9]]);
   map.fire('zoomend');          // heatScale sizes the sprite from the ground distance
-  rainHeat._redraw();           // draw now rather than on the next animation frame
+  heat._redraw();           // draw now rather than on the next animation frame
 
   const px = km => {
     const c = map.getCenter();
@@ -80,8 +80,8 @@ try {
   // The canvas is padded — see PATCH 3 in vendor/leaflet-heat.js. A container point is not a
   // canvas point, and reading one as the other silently samples the wrong pixel.
   const pixAt = ll => {
-    const pad = rainHeat._pad(), p = map.latLngToContainerPoint(L.latLng(ll));
-    const d = rainHeat._canvas.getContext('2d')
+    const pad = heat._pad(), p = map.latLngToContainerPoint(L.latLng(ll));
+    const d = heat._canvas.getContext('2d')
       .getImageData(Math.round(p.x + pad.x), Math.round(p.y + pad.y), 1, 1).data;
     return { a: d[3], hex: [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('') };
   };
@@ -97,25 +97,25 @@ try {
   // painted, and an assertion on a field nothing renders from passes while the map is wrong.
   const reach = () => {
     let last = 0;
-    for (let d = 0; d <= RAIN_KM * 1.5; d += 0.1) if (alphaAt(east(-d)) > 0) last = d;
+    for (let d = 0; d <= HEAT_KM * 1.5; d += 0.1) if (alphaAt(east(-d)) > 0) last = d;
     return last;
   };
-  const want = px(RAIN_KM);
-  const wet = alphaAt(WET), dry = alphaAt(DRY), mirror = alphaAt(MIRROR), mid = alphaAt(MID);
-  const fade = pixAt(FADE);
+  const want = px(HEAT_KM);
+  const wet = alphaAt(WET), dry = alphaAt(DRY), mirror = alphaAt(MIRROR);
+  const wetSide = alphaAt(WETSIDE), drySide = alphaAt(DRYSIDE);
 
   // The same paint with nothing arguing against it, to measure the erase against.
-  rainHeat.setDry([]);
-  rainHeat._redraw();
-  const rawWet = pixAt(WET), rawDry = alphaAt(DRY), rawMid = alphaAt(MID);
+  heat.setDry([]);
+  heat._redraw();
+  const rawWet = pixAt(WET), rawDry = alphaAt(DRY);
   const rawHalf = pixAt(HALF), rawOuter = pixAt(OUTER);
 
-  say('zoom ' + map.getZoom() + ', ' + RAIN_KM + ' km = ' + Math.round(want) + ' px');
+  say('zoom ' + map.getZoom() + ', ' + HEAT_KM + ' km = ' + Math.round(want) + ' px');
   say('dry gauge ' + GAP.toFixed(2) + ' km east of the wet one');
   say('');
   const drew = reach();
-  ok('a blob paints RAIN_KM of ground   ', Math.abs(drew - RAIN_KM) <= 0.25,
-     'paint reaches ' + drew.toFixed(1) + ' km, wanted ' + RAIN_KM + ' km');
+  ok('a blob paints HEAT_KM of ground   ', Math.abs(drew - HEAT_KM) <= 0.25,
+     'paint reaches ' + drew.toFixed(1) + ' km, wanted ' + HEAT_KM + ' km');
   ok('a wet gauge paints                ', wet > 0, 'alpha ' + wet);
   ok('a dry gauge is left almost clear  ', dry <= rawDry * 0.02,
      'alpha ' + dry + ', was ' + rawDry + ' before the erase');
@@ -125,135 +125,365 @@ try {
      'alpha ' + wet + ' on the gauge, ' + rawWet.a + ' with no dry gauge present');
   ok('ground away from it is untouched  ', mirror > 0.6 * rawWet.a,
      'alpha ' + mirror + ' the same distance the other way');
-  /* A blob says what its gauge said, once, and the halo is spent on opacity alone. simpleheat looks
-     the gradient up by alpha, so any fade applied *before* `_colorize()` walks down the colour
-     scale — at the old BLUR one gauge reading 27 mm/h drew heavy, moderate and light in rings.
-     The feather runs after it, so the edge goes pale without changing what it claims. */
-  ok('one hue from the middle to the edge', sameHue(rawHalf.hex, rawWet.hex)
-       && sameHue(rawOuter.hex, rawWet.hex),
-     '#' + rawWet.hex + ' on the gauge, #' + rawHalf.hex + ' at half, #' + rawOuter.hex + ' at 92%');
-  ok('and the edge really is soft       ', rawOuter.a < rawHalf.a * 0.6 && rawOuter.a > 0,
-     'alpha ' + rawWet.a + ' -> ' + rawHalf.a + ' -> ' + rawOuter.a);
-  /* The erase pass runs after simpleheat's `_colorize()`, so it takes alpha away from a pixel whose
-     colour is already decided. That ordering is the whole reason a denied edge fades out instead of
-     restating the rain as a lighter class. Move the erase inside the draw loop and this fails. */
-  ok('erasing fades, it does not recolour', sameHue(fade.hex, rawWet.hex)
-       && fade.a > rawWet.a * 0.1 && fade.a < rawWet.a * 0.8,
-     '#' + fade.hex + ' at alpha ' + fade.a + ', against #' + rawWet.hex + ' at ' + rawWet.a);
-  // Neither reading outranks the other. Halfway between the two gauges the erase is still fading,
-  // so some paint stands and some is gone. All of it, or none, would mean one of them won.
-  ok('halfway between, neither one wins ', mid > 0 && mid < rawMid,
-     'alpha ' + mid + ' at the midpoint, ' + rawMid + ' with no dry gauge present');
+  /* A class is one flat colour from the gauge to the rim, and one alpha. A fade anywhere in between
+     would be the soft wash back, and it would carry the distance from the gauge in the same channel
+     as the class. The rim probe at 92% sits where that fade used to be deepest. */
+  ok('one colour and one alpha to the rim', sameHue(rawHalf.hex, rawWet.hex) && sameHue(rawOuter.hex, rawWet.hex)
+       && rawHalf.a === rawWet.a && rawOuter.a === rawWet.a,
+     '#' + rawWet.hex + ' at ' + rawWet.a + ' on the gauge, #' + rawHalf.hex + ' at ' + rawHalf.a
+     + ' at half, #' + rawOuter.hex + ' at ' + rawOuter.a + ' at 92%');
+  const want9 = HUES[classOf(0.9, WATER_CLASSES)];
+  ok('and the colour is the class colour', rawWet.hex === want9, '#' + rawWet.hex + ' against #' + want9);
+  /* The halfway rule. A dry gauge owns the ground nearer to it than to the wet gauge, and the wet
+     gauge owns the rest. Both sides are whole: a cell is on the wash or it is off it. */
+  ok('the wet side of the halfway line stays', wetSide === rawWet.a, 'alpha ' + wetSide + ' at 0.3 of the gap');
+  ok('the dry side of the halfway line goes ', drySide === 0, 'alpha ' + drySide + ' at 0.7 of the gap');
 
   /* A second gauge on the diagonal, 1.2 blobs away. That is far enough for thinHeat() to keep both,
      and it lands outside the first blob's circle but inside the square that circle is inscribed in.
      A radial gradient clamps past its last stop rather than stopping, so a feather filled as a
      square erased that corner outright and took this gauge's paint with it — hard rectangles cut
      out of the wash, about 2r on a side. Both passes fill a disc now. */
-  const diag = RAIN_KM * 1.2 / Math.SQRT2;
+  const diag = HEAT_KM * 1.2 / Math.SQRT2;
   const FAR = [WET[0] + diag / 111, WET[1] + diag / (111 * Math.cos(WET[0] * Math.PI / 180))];
-  rainHeat.setLatLngs([[...WET, 0.9], [...FAR, 0.9]]);
-  rainHeat._redraw();
+  heat.setLatLngs([[...WET, 0.9], [...FAR, 0.9]]);
+  heat._redraw();
   const far = pixAt(FAR);
   ok('a neighbour blob is not squared off', far.a >= rawWet.a * 0.9 && sameHue(far.hex, rawWet.hex),
-     'alpha ' + far.a + ' at a gauge ' + (RAIN_KM * 1.2).toFixed(1)
+     'alpha ' + far.a + ' at a gauge ' + (HEAT_KM * 1.2).toFixed(1)
      + ' km away on the diagonal, against ' + rawWet.a + ' alone');
 
   /* Two gauges one blob apart, the closest thinHeat() ever leaves them. Two readings of the same
      rain still mean that rain, so the ground between them must not come out heavier than either.
      Every canvas `over` adds alpha, which is why the layer computes a field instead of stamping
      shapes — when it stamped them, two 179 blobs met at 227 in the class above what either read. */
-  const TWO = east(RAIN_KM);
-  rainHeat.setLatLngs([[...WET, 0.7], [...TWO, 0.7]]);
-  rainHeat._redraw();
-  const oneA = pixAt(WET), oneB = pixAt(TWO), between = pixAt(east(RAIN_KM / 2));
+  const TWO = east(HEAT_KM);
+  heat.setLatLngs([[...WET, 0.7], [...TWO, 0.7]]);
+  heat._redraw();
+  const oneA = pixAt(WET), oneB = pixAt(TWO), between = pixAt(east(HEAT_KM / 2));
   /* Never brighter is the rule, and the union coverage below holds it: it cannot pass 1, and a
      gauge centre is already at 1. A count or two dimmer is rounding. */
   ok('two equal readings do not stack   ', between.a <= oneA.a + 2 && between.a >= oneA.a * 0.9
        && sameHue(between.hex, oneA.hex),
      'alpha ' + oneA.a + ' at A, ' + between.a + ' between, ' + oneB.a + ' at B');
 
-  // And two different readings hand over rather than cutting. Each channel at the midpoint has to
-  // sit between the two ends, which is what "smooth transition" means in a number.
-  rainHeat.setLatLngs([[...WET, 0.95], [...TWO, 0.35]]);
-  rainHeat._redraw();
-  const hi = pixAt(WET), lo = pixAt(TWO), mix = pixAt(east(RAIN_KM / 2));
-  const ch = (s, i) => parseInt(s.slice(i, i + 2), 16);
-  const tween = [0, 2, 4].every(i => {
-    const a = ch(hi.hex, i), b = ch(lo.hex, i), m = ch(mix.hex, i);
-    return m >= Math.min(a, b) - 8 && m <= Math.max(a, b) + 8;
-  });
-  ok('and different ones blend across   ', tween && mix.a < hi.a && mix.a > lo.a,
-     '#' + hi.hex + ' -> #' + mix.hex + ' -> #' + lo.hex
-     + ', alpha ' + hi.a + ' -> ' + mix.a + ' -> ' + lo.a);
+  /* Two different readings hand over by class, and nothing between them takes a colour the legend
+     lacks. The weight walks from 0.95 to 0.35 across the line, through every class, so any blended
+     tint would show up here. A class edge costs about two pixels of antialiasing from the canvas
+     upscale, so a handful of off-legend pixels is the edge and a wide run of them is a blend.
+     Counted over every pixel on the line. */
+  heat.setLatLngs([[...WET, 0.95], [...TWO, 0.35]]);
+  heat._redraw();
+  {
+    const steps = Math.round(px(HEAT_KM));
+    let mixed = 0, seen = 0, last = null, changes = 0;
+    for (let i = 0; i <= steps; i++) {
+      const p = pixAt(east(HEAT_KM * i / steps));
+      if (p.a < 250) continue;
+      seen++;
+      const k = HUES.findIndex(h => sameHue(p.hex, h));
+      if (k < 0) { mixed++; continue; }
+      if (k !== last) { changes++; last = k; }
+    }
+    ok('only legend colours between two gauges', seen > steps * 0.6 && mixed <= 15,
+       mixed + ' off-legend pixels of ' + seen + ' drawn, wanted at most 15 (five edges, three pixels each)');
+    ok('and the classes run in order across ', changes <= 6, changes + ' colour changes on the line, wanted at most 6');
+  }
 
-  /* The same two questions at the spacing the network really has. `thinHeat()` guarantees one radius
-     between two gauges and no more, and on the live payload every overlapping pair sat between 1.01
-     and 1.58 of one. So 1.6 r is the far end of the real range rather than a corner case.
-     Coverage was once the `max` of the per-gauge weights, and `max` follows whichever gauge is
-     nearer — so its slope flips sign on the equidistant line, which is a Voronoi edge. It also read
-     two overlapping readings as one. Measured before the union: two gauges agreeing on 0.70 held
-     alpha 179 each and 61 between them, and an unequal pair fell to 54 between ends of 242 and 89.
-     A midpoint darker than both of its ends is a border drawn between two cells. */
-  /* Two probes, at the two spacings the gauge network really has.
+  /* A join is solid at the spacing the network really has. Two gauges that agree on one reading
+     leave no seam between them, wherever the pair sits inside the reach.
      **The spacings come from the station geometry and not from taste, and they move with
-     `RAIN_KM`.** Thinning every rain gauge at 6 km leaves 82 nearest-neighbour pairs with a median
+     `HEAT_KM`.** Thinning every rain gauge at 6 km leaves 82 nearest-neighbour pairs with a median
      of 1.21 r and a 90th percentile of 1.66 r. Read it from the stations, which do not move, and
-     never from the wet gauges of the moment — the wet set changes with the weather, and two
-     snapshots an hour apart put the widest pair at 1.58 r and 1.90 r. Thinning at a *shorter*
-     distance also spaces gauges relatively further apart: the same 90th percentile was 1.48 r when
-     `RAIN_KM` was 9. Re-run the sweep in CLAUDE.md after touching either constant.
-     A join at the median must be solid. At the 90th percentile the two blobs are 10 km apart and
-     each stops 3 km short of the ground between them, so a real dip there is honest — that probe
-     only has to stay clear of what a `max` would draw, which is 23%. */
-  const join = (gap, want, name) => {
-    const B = east(RAIN_KM * gap), mid = east(RAIN_KM * gap / 2);
+     never from the wet gauges of the moment. Re-run the sweep in docs/VERIFY.md after touching
+     either constant. */
+  const join = (gap, name) => {
+    const B = east(HEAT_KM * gap), mid = east(HEAT_KM * gap / 2);
     map.setView(mid, 12, { animate: false });   // both gauges well inside the canvas at this gap
-    rainHeat.setLatLngs([[...WET, 0.7], [...B, 0.7]]);
-    rainHeat._redraw();
+    heat.setLatLngs([[...WET, 0.7], [...B, 0.7]]);
+    heat._redraw();
     const a = pixAt(WET), b = pixAt(B), m = pixAt(mid);
-    ok(name, m.a >= a.a * want && sameHue(m.hex, a.hex),
-       'alpha ' + a.a + ' at A, ' + m.a + ' between, ' + b.a + ' at B, ' + gap + ' r apart, wanted '
-       + Math.round(a.a * want));
-    return B;
+    ok(name, m.a === a.a && sameHue(m.hex, a.hex),
+       'alpha ' + a.a + ' at A, ' + m.a + ' between, ' + b.a + ' at B, ' + gap + ' r apart');
   };
-  join(1.21, 0.97, 'a join is solid at median spacing ');
-  const WIDE = join(1.66, 0.33, 'and stands up at the 90th pct     ');
+  join(1.21, 'a join is solid at median spacing ');
+  join(1.66, 'and at the 90th percentile      ');
 
-  /* The handover between two different readings, at the median spacing. **Not at the wider one**:
-     there the blobs have genuinely parted, so the midpoint is fainter than the weaker gauge and
-     "between the two ends" stops being the contract. */
-  rainHeat.setLatLngs([[...WET, 0.95], [...east(RAIN_KM * 1.21), 0.35]]);
-  rainHeat._redraw();
-  const wh = pixAt(WET), wl = pixAt(east(RAIN_KM * 1.21)), wm = pixAt(east(RAIN_KM * 0.605));
-  ok('a handover never dips under both  ', wm.a < wh.a && wm.a > wl.a,
-     'alpha ' + wh.a + ' -> ' + wm.a + ' -> ' + wl.a + ', 1.21 r apart');
+  /* **A gauge reporting no rain owns the ground nearer to it than to any wet gauge.** Two wet gauges
+     1.2 r apart with a dry gauge on the midpoint: the dry gauge sits 0.6 r from each. A point 0.1 r
+     from the dry gauge toward the first wet one is nearer the dry gauge and is denied. A point
+     0.1 r from the first wet gauge is nearer that one and stays. The old erase was a stamp with a
+     scalar radius that shrank to half the gap to the nearest wet gauge in every direction, and it
+     left ground like the first point untouched. */
+  const W2 = east(HEAT_KM * 1.2);
+  map.setView(east(HEAT_KM * 0.6), 12, { animate: false });
+  heat.setDry([east(HEAT_KM * 0.6)]);
+  heat.setLatLngs([[...WET, 0.7], [...W2, 0.7]]);
+  heat._redraw();
+  const nearDry = alphaAt(east(HEAT_KM * 0.5)), nearWet = alphaAt(east(HEAT_KM * 0.1));
+  ok('the ground nearer a dry gauge is denied', nearDry === 0, 'alpha ' + nearDry + ' at 0.1 r from the dry gauge');
+  ok('and the ground nearer a wet one stays ', nearWet > 0, 'alpha ' + nearWet + ' at 0.1 r from the wet gauge');
 
-  /* **A gauge reporting no rain reaches as far as a gauge reporting rain.** Both are one reading and
-     both cover `RAIN_KM`, so the denial has to carry the same ground the paint does.
-     The old erase was a `destination-out` stamp with one scalar radius, `min(r, nearest_wet / 2)`.
-     That is a circle, so a dry gauge with a wet neighbour to the east shrank in *every* direction,
-     including west where nothing disputed it. Measured on the live network: 143 of 191 dry gauges
-     were capped, at a median of 0.54 of the radius, and together they denied 35% of the ground they
-     were entitled to deny.
-     Two wet gauges 1.2 r apart with a dry gauge on the midpoint is the case that separates the two
-     rules. The dry gauge sits 0.6 r from each, so the old cap gave it an eraser of 0.3 r — which
-     stops dead at the point probed here, 0.3 r along the line toward the first gauge. The old rule
-     leaves that point untouched. The new one denies about half of it, because there the two
-     readings are equidistant and neither outranks the other. */
-  const W2 = east(RAIN_KM * 1.2), REACH = east(RAIN_KM * 0.3);
-  map.setView(east(RAIN_KM * 0.6), 12, { animate: false });
-  rainHeat.setDry([]);
-  rainHeat.setLatLngs([[...WET, 0.7], [...W2, 0.7]]);
-  rainHeat._redraw();
-  const openGround = pixAt(REACH).a;
-  rainHeat.setDry([east(RAIN_KM * 0.6)]);
-  rainHeat._redraw();
-  const denied = pixAt(REACH).a;
-  ok('a dry gauge reaches as far as a wet', denied > openGround * 0.25 && denied < openGround * 0.75,
-     'alpha ' + openGround + ' with no dry gauge, ' + denied + ' with one 0.3 r away, wanted '
-     + Math.round(openGround * 0.25) + ' to ' + Math.round(openGround * 0.75)
-     + ' (the old scalar cap left it untouched)');
+  /* The gate every heat weight passes through. A station that is online but whose stamp is more
+     than a day old is frozen on whatever it read, so it must neither paint nor deny. */
+  const { heatOk } = await import('./js/util.js');
+  const pad2 = n => String(n).padStart(2, '0');
+  const stamp = ms => {
+    const d = new Date(Date.now() - ms);
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+  };
+  const gauge = over => ({ kind: 'rainfall', online: true, hourly: 4, updated: stamp(6e5), ...over });
+  ok('fresh gauge feeds heat',       heatOk(gauge({})) === true, '');
+  ok('two-day-old stamp feeds none', heatOk(gauge({ updated: stamp(2 * 864e5) })) === false, '');
+  ok('offline gauge feeds none',     heatOk(gauge({ online: false })) === false, '');
+  ok('no reading feeds none',        heatOk(gauge({ hourly: null })) === false, '');
+
+  // Which class a weight falls in. The edges are strict, so a reading on an edge stays below it.
+  /* Thirteen rain classes, each JPS class split in quarters. Weights come from RAIN_STOPS: 0 mm is
+     0.25, 10 mm is 0.5, 30 mm is 0.75 and 60 mm is 1. So the edges fall at 2.5, 5, 7.5, 10, 15, 20,
+     25, 30, 37.5, 45 and 52.5 mm, and the open top class is above 60. A reading on an edge stays in
+     the class below it. */
+  const mmw = mm => scalePos(mm, RAIN_STOPS) / 100;
+  for (const [mm, k] of [[2, 0], [2.5, 0], [3, 1], [5, 1], [6, 2], [8, 3], [10, 3], [12, 4], [18, 5], [22, 6],
+                         [28, 7], [35, 8], [40, 9], [50, 10], [55, 11], [61, 12]])
+    ok('classOf ' + mm + ' mm is band ' + k + '          '.slice(String(k).length), classOf(mmw(mm), RAIN_CLASSES) === k,
+       'band ' + classOf(mmw(mm), RAIN_CLASSES) + (mm === 10 ? ', JPS moderate is above 10' : ''));
+  ok('the classes number thirteen, and water five', RAIN_CLASSES.length === 13 && WATER_CLASSES.length === 5, '');
+
+  // A lone gauge: the wash ends at the reach. A pixel just past it is empty, and a pixel just inside
+  // it carries the class colour whole.
+  map.setView(WET, 12, { animate: false });
+  heat.setDry([]);
+  heat.setLatLngs([[...WET, 0.6]]);
+  heat._redraw();
+  const edgeIn = pixAt(east(-HEAT_KM * 0.97)), edgeOut = pixAt(east(-HEAT_KM * 1.06));
+  ok('the wash is whole just inside the reach', edgeIn.a === rawWet.a && edgeIn.hex === HUES[classOf(0.6, WATER_CLASSES)],
+     '#' + edgeIn.hex + ' at alpha ' + edgeIn.a);
+  ok('and empty just past it                ', edgeOut.a === 0, 'alpha ' + edgeOut.a);
+
+  /* **The contour edge keeps the data's accuracy, and it is one pixel wide.** Each probe reads the
+     layer's own canvas, in canvas pixels, and states a promise the 4 px grid could not keep alone:
+     the edge sits where the field puts it, to a fraction of a cell, and it is antialiased across
+     about one pixel rather than stepped or blurred. */
+  const cv = heat._canvas.getContext('2d');
+  const origin = ll => { const pad = heat._pad(), p = map.latLngToContainerPoint(L.latLng(ll)); return [p.x + pad.x, p.y + pad.y]; };
+  const alphaXY = (x, y) => cv.getImageData(Math.floor(x), Math.floor(y), 1, 1).data[3];
+  // The outermost point along a ray whose alpha is at least half. Half is where an antialiased edge
+  // crosses. Pixels are read by `floor` and the ray steps a quarter pixel, so the reading is good to
+  // about a quarter of a pixel. A half-pixel step with `round` read a true 0.8 px shrink as 2.0 px.
+  const edgeAlong = (c, ang, max) => {
+    let last = 0;
+    for (let d = 0; d <= max; d += 0.25) if (alphaXY(c[0] + d * Math.cos(ang), c[1] + d * Math.sin(ang)) >= 128) last = d;
+    return last;
+  };
+  {
+    const c = origin(WET), r = px(HEAT_KM);
+    const worst = Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map(i => Math.abs(edgeAlong(c, i * Math.PI / 4 + 0.2, r * 1.2) - r)));
+    ok('the reach is a circle of the right radius', worst <= 1.5, 'worst of 8 rays is ' + worst.toFixed(2) + ' px off, wanted at most 1.5 (r = ' + r.toFixed(1) + ' px)');
+    // Across the rim: how many pixels are neither empty nor whole. A stepped edge has none and a
+    // blurred one has dozens. One pixel of antialiasing leaves at most two.
+    let partial = 0;
+    for (let d = r - 6; d <= r + 6; d += 1) { const a = alphaXY(c[0] - d, c[1]); if (a > 10 && a < 245) partial++; }
+    ok('the edge is one pixel wide           ', partial <= 2, partial + ' partial pixels across the rim, wanted at most 2');
+  }
+  // The halfway line between a wet gauge and a dry one: where the wash ends along the line between them.
+  heat.setDry([DRY]);
+  heat._redraw();
+  {
+    const c = origin(WET), half = px(GAP / 2);
+    const x = edgeAlong(c, 0, px(GAP));
+    ok('the halfway line sits at the halfway point', Math.abs(x - half) <= 1.5, 'the wash ends ' + x.toFixed(1) + ' px from the wet gauge, wanted ' + half.toFixed(1) + ' +- 1.5');
+  }
+  /* A class edge is one smooth curve, not a staircase of cells. Two unlike gauges 1.21 r apart. Along
+     rows two pixels apart, find where the first class gives way. A curve moves a little each row, so
+     its second difference stays small. A 4 px grid would step by 4 px at a time, which is a second
+     difference of 4 or more. */
+  heat.setDry([]);
+  heat.setLatLngs([[...WET, 0.95], [...east(HEAT_KM * 1.21), 0.35]]);
+  map.setView(east(HEAT_KM * 0.6), 12, { animate: false });
+  heat._redraw();
+  {
+    const c = origin(WET), top = HUES[classOf(0.95, WATER_CLASSES)], xs = [];
+    for (let j = -20; j <= 20; j += 2) {
+      let x = null;
+      for (let d = 0; d <= px(HEAT_KM * 0.9); d += 1) {
+        const data = cv.getImageData(Math.round(c[0] + d), Math.round(c[1] + j * 2), 1, 1).data;
+        const hex = [data[0], data[1], data[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+        if (data[3] > 200 && !sameHue(hex, top)) { x = d; break; }
+      }
+      if (x !== null) xs.push(x);
+    }
+    let second = 0;
+    for (let i = 1; i < xs.length - 1; i++) second = Math.max(second, Math.abs(xs[i - 1] - 2 * xs[i] + xs[i + 1]));
+    ok('a class edge is one smooth curve', xs.length >= 15 && second <= 2.5,
+       xs.length + ' rows found the edge, largest second difference ' + second + ' px, wanted at most 2.5');
+  }
+  map.setView(WET, 12, { animate: false });
+
+  /* **Corners are rounded, and the rounding is bounded.** The wash is the positive part of a field
+     that is a `min()` of other fields, so it has corners wherever two of them meet. The grid is
+     blurred before it is traced. A straight edge must not move, and a corner must be cut. */
+  const { smoothGrid } = await import('./js/heat.js');
+  {
+    const W = 40, F = new Float32Array(W * W), G = new Float32Array(W * W);
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) { F[y * W + x] = x - 20; G[y * W + x] = Math.min(x - 20, y - 20); }
+    smoothGrid(F, W, W, 3); smoothGrid(G, W, W, 3);
+    ok('smoothing leaves a straight edge where it was', Math.abs(F[20 * W + 20]) < 0.01, 'the field at the edge is ' + F[20 * W + 20].toFixed(4));
+    ok('and cuts a corner                         ', G[20 * W + 20] < -1, 'the field at the corner is ' + G[20 * W + 20].toFixed(2) + ', wanted below -1');
+    const small = new Float32Array(W * W).fill(1);
+    smoothGrid(small, W, W, 0.3);
+    ok('and a blur under half a cell does nothing ', small.every(v => v === 1), '');
+  }
+  // Two reach circles that cross leave a notch on the line between the gauges. The blur fills it,
+  // but by no more than SMOOTH of the reach. Measured outward along the perpendicular bisector.
+  heat.setDry([]);
+  heat.setLatLngs([[...WET, 0.6], [...east(HEAT_KM * 1.6), 0.6]]);
+  map.setView(east(HEAT_KM * 0.8), 12, { animate: false });
+  heat._redraw();
+  {
+    const r = px(HEAT_KM), m = origin(east(HEAT_KM * 0.8));
+    let top = 0;
+    for (let d = 0; d <= r; d += 0.5) if (alphaXY(m[0], m[1] - d) >= 128) top = d;
+    const sharp = r * 0.6;
+    // The fill is bounded by SMOOTH of the reach, and the scan reads to within a pixel or two.
+    ok('a notch between two circles is filled   ', top > sharp + 1 && top <= r * 0.7 + 2,
+       'the wash reaches ' + top.toFixed(1) + ' px along the bisector, wanted between ' + (sharp + 1).toFixed(1) + ' and ' + (r * 0.7 + 2).toFixed(1));
+  }
+  // A lone circle keeps its size at a low zoom, where the reach is only about 20 px.
+  heat.setLatLngs([[...WET, 0.6]]);
+  map.setView(WET, 9, { animate: false });
+  heat._redraw();
+  {
+    const c = origin(WET), r = px(HEAT_KM);
+    const worst = Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map(i => Math.abs(edgeAlong(c, i * Math.PI / 4 + 0.2, r * 1.5) - r)));
+    ok('a lone circle keeps its size at zoom 9   ', worst <= 1.5, 'worst of 8 rays is ' + worst.toFixed(2) + ' px off, r = ' + r.toFixed(1) + ' px');
+  }
+  map.setView(WET, 12, { animate: false });
+  heat.setLatLngs([[...WET, 0.6]]);
+  heat._redraw();
+
+  /* **The rain wash is an estimate between gauges.** The reach form above belongs to the water layer
+     now, and its assertions run on `heat`. These run on `rainHeat`, which interpolates: a distance-
+     weighted mean of every gauge within INTERP_KM, wet and dry, with a dry gauge as the value 0 and a
+     constant prior of 0 that makes the value fall to half at PRIOR_KM. Each probe states one promise. */
+  rainHeat.addTo(map);
+  map.fire('zoomend');
+  const RH = RAIN_CLASSES.map(c => c[1].slice(1));
+  const rpix = ll => {
+    const pad = rainHeat._pad(), q = map.latLngToContainerPoint(L.latLng(ll));
+    const d = rainHeat._canvas.getContext('2d').getImageData(Math.round(q.x + pad.x), Math.round(q.y + pad.y), 1, 1).data;
+    return { a: d[3], hex: [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('') };
+  };
+  const rcls = ll => { const q = rpix(ll); return q.a === 0 ? -1 : RH.findIndex(h => sameHue(q.hex, h)); };
+  const paint = (wet, dryList = []) => { rainHeat.setDry(dryList); rainHeat.setLatLngs(wet); rainHeat._redraw(); };
+  const at = (dx, dy) => [WET[0] + dy / 111, WET[1] + dx / (111 * Math.cos(WET[0] * Math.PI / 180))];
+  map.setView(WET, 12, { animate: false });
+
+  // A gauge keeps its own reading. Three gauges 8 km apart, at three different classes.
+  paint([[...east(-8), 0.3], [...WET, 0.6], [...east(8), 1]]);
+  for (const [ll, w] of [[east(-8), 0.3], [WET, 0.6], [east(8), 1]])
+    ok('a gauge keeps its own class (' + w + ')       ', rcls(ll) === classOf(w, RAIN_CLASSES) && rpix(ll).a === 255,
+       'class ' + rcls(ll) + ', wanted ' + classOf(w, RAIN_CLASSES));
+
+  // A lone gauge draws a hill, not a disc. The class falls with distance, and the wash ends at the
+  // cover limit rather than at the 12 km where the estimate itself would end.
+  paint([[...WET, 0.6]]);
+  {
+    const k0 = rcls(WET), k2 = rcls(east(2)), k6 = rcls(east(6));
+    ok('a lone gauge draws a hill                ', k2 <= k0 && k6 >= 0 && k6 < k0, 'classes ' + k0 + ', ' + k2 + ', ' + k6 + ' at 0, 2 and 6 km');
+    ok('and the wash ends before 10.5 km         ', rpix(east(8)).a > 0 && rpix(east(10.8)).a === 0,
+       'alpha ' + rpix(east(8)).a + ' at 8 km, ' + rpix(east(10.8)).a + ' at 10.8 km');
+  }
+
+  // Two equal gauges 8 km apart: the ground between them is a little under either, and never over.
+  // The estimate at the midpoint is 0.49 against 0.6 at a gauge, which is two of the 13 bands.
+  paint([[...WET, 0.6], [...east(8), 0.6]]);
+  {
+    const kg = rcls(WET), km = rcls(east(4));
+    ok('between two equal gauges, at most two bands under', km >= kg - 2 && km <= kg, 'band ' + km + ' at the midpoint, ' + kg + ' at a gauge');
+  }
+
+  // A dry gauge is evidence. The field falls toward it, and it is bare at the gauge.
+  paint([[...WET, 0.9]], [east(6)]);
+  {
+    const ks = [];
+    for (let d = 0; d <= 5.5; d += 0.5) { const k = rcls(east(d)); if (k >= 0) ks.push(k); }
+    const rises = ks.slice(1).filter((k, i) => k > ks[i]).length;
+    ok('the ground is bare at a dry gauge        ', rpix(east(6)).a === 0, 'alpha ' + rpix(east(6)).a);
+    ok('and painted 1 km from the wet gauge      ', rpix(east(1)).a > 0, 'alpha ' + rpix(east(1)).a);
+    ok('and the classes fall toward the dry one  ', rises === 0 && ks.length >= 6, 'classes ' + ks.join(' ') + ', rises ' + rises);
+  }
+
+  // A very heavy gauge among light ones keeps the top class. Blurring lowers a peak, and the put-back
+  // near a gauge is what restores it.
+  paint([[...WET, 1], [...at(3, 0), 0.3], [...at(-3, 0), 0.3], [...at(0, 3), 0.3], [...at(0, -3), 0.3]]);
+  ok('a very heavy gauge among light ones keeps the top class', rcls(WET) === RH.length - 1, 'class ' + rcls(WET) + ', wanted ' + (RH.length - 1));
+
+  // Two gauges 50 m apart, unlike: nothing divides by zero or leaves a hole. They sit 1.3 px apart,
+  // inside one grid cell, so the nearer gauge sets the plateau and the other cannot show. The
+  // promise is only that the wash is whole there, and finite.
+  paint([[...WET, 0.9], [...east(0.05), 0.3]]);
+  ok('two gauges 50 m apart leave no hole      ', [WET, east(0.025), east(0.05)].every(ll => rpix(ll).a === 255),
+     'alphas ' + [WET, east(0.025), east(0.05)].map(ll => rpix(ll).a).join(' '));
+
+  // All gauges dry: nothing paints, and nothing throws.
+  paint([], [WET, east(2)]);
+  ok('all gauges dry paints nothing            ', [WET, east(1), east(5)].every(ll => rpix(ll).a === 0), '');
+
+  // Bare ground. A lone very heavy gauge reaches the cover limit and no further.
+  paint([[...WET, 1]]);
+  ok('ground past the cover limit stays bare   ', rpix(east(9)).a > 0 && rpix(east(11)).a === 0,
+     'alpha ' + rpix(east(9)).a + ' at 9 km, ' + rpix(east(11)).a + ' at 11 km');
+  paint([[...WET, 0.6]]);
+
+
+  /* The wash sits under the place names. Both layers put their canvas in the `heat` pane, which is
+     over the ground tiles and under the names, so a name reads over the wash. */
+  {
+    const zi = n => +getComputedStyle(map.getPane(n)).zIndex;
+    ok('the wash canvas is in the heat pane      ', rainHeat._canvas.parentNode === map.getPane('heat'), 'parent is ' + rainHeat._canvas.parentNode.className);
+    // This page loads no stylesheet, so the tile pane has no z-index here. map-limits-test.html loads
+    // them and asserts that the heat pane is over the ground. This one states the other half.
+    ok('which is under the place names           ', zi('heat') < zi('labels'),
+       'heat ' + zi('heat') + ', names ' + zi('labels'));
+    ok('and takes no pointer events              ', getComputedStyle(map.getPane('heat')).pointerEvents === 'none', '');
+  }
+
+  /* The dark theme has its own rain colours. Very heavy rain must draw in the dark set's top colour
+     on a dark ground, and in the light set's on a light one. The theme goes back after. */
+  {
+    const { RAIN_CLASSES_DARK } = await import('./js/config.js');
+    const root = document.documentElement, was = root.dataset.theme;
+    const topLight = RAIN_CLASSES[RAIN_CLASSES.length - 1][1].slice(1), topDark = RAIN_CLASSES_DARK[RAIN_CLASSES_DARK.length - 1][1].slice(1);
+    rainHeat.setDry([]);
+    rainHeat.setLatLngs([[...WET, 1]]);
+    root.dataset.theme = 'dark';
+    rainHeat._redraw();
+    const dk = rpix(WET);
+    root.dataset.theme = 'light';
+    rainHeat._redraw();
+    const lt = rpix(WET);
+    if (was === undefined) delete root.dataset.theme; else root.dataset.theme = was;
+    ok('very heavy rain takes the dark colour on dark ', dk.hex === topDark, '#' + dk.hex + ', wanted #' + topDark);
+    ok('and the light colour on light               ', lt.hex === topLight, '#' + lt.hex + ', wanted #' + topLight);
+    ok('the two sets have the same edges            ', RAIN_CLASSES_DARK.length === RAIN_CLASSES.length
+         && RAIN_CLASSES_DARK.every((c, i) => c[0] === RAIN_CLASSES[i][0]), '');
+    rainHeat.setLatLngs([[...WET, 0.6]]);
+    rainHeat._redraw();
+  }
+
+  /* The opacity cap. A class carries a colour and no opacity, so the Settings slider alone sets
+     it, and it stops at 80%. A stored 95% from before the cap must read as 80%. */
+  PREFS.heatOpacity = 0.95;
+  heatOpacity();
+  const shown = +rainHeat._canvas.style.opacity;
+  ok('opacity stops at the cap', HEAT_OPACITY_MAX === 0.8 && Math.abs(shown - 0.8 * (rainHeat._fade ?? 1)) < 1e-6,
+     'canvas opacity ' + shown + ' from a stored 0.95, cap ' + HEAT_OPACITY_MAX);
+  PREFS.heatOpacity = 0.4;
+  heatOpacity();
+  ok('and below the cap it follows the slider', Math.abs(+rainHeat._canvas.style.opacity - 0.4 * (rainHeat._fade ?? 1)) < 1e-6,
+     'canvas opacity ' + rainHeat._canvas.style.opacity + ' from a stored 0.4');
+  delete PREFS.heatOpacity;
 
   say('');
   say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');

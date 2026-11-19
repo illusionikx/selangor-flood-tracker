@@ -619,6 +619,10 @@ order that file holds them. A trap names itself here, and the file states the ev
 - A blob is painted `radius + blur` across, not `radius`.
 - "Gauge" in the rain heat entries below means a rainfall station.
 - A rain gauge reporting zero is a reading, and the rain heat layer draws it.
+- THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.
+- THE WASH EDGE IS A CONTOUR OF A FIELD, AND FOUR THINGS BREAK IT SILENTLY.
+- THE WASH SHAPE IS SMOOTHED BY BLURRING ITS FIELD, NEVER ITS PICTURE.
+- THE WASH HAS A PANE OF ITS OWN AT 250, AND NO FILTER MAY REACH IT.
 - NEITHER HEAT WASH FOLLOWS THE THREE-COLOUR RULE, AND THAT IS SETTLED.
 - A heat blob's alpha is its colour as well as its size.
 - A rim facing empty ground and a join between two blobs are different edges.
@@ -682,7 +686,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - The coverage area is placed on LAND alone, and only `border-build.php` can ...
 - THE CIRCLE IS GONE AND THE CIRCLE ARITHMETIC WENT WITH IT.
 - The MET nowcast page has no endpoint to find.
-- `MET_KM` is a flat 15 km, not a radius scaled to how far each point reaches.
+- `MET_KM` is a flat 16.5 km, not a radius scaled to how far each point reaches.
 - The warning feed carries no coordinates.
 - The two warning surfaces disagree about time on purpose, and `fresh` is the...
 - A MET warning counts toward nothing.
@@ -1007,6 +1011,10 @@ order that file holds them. A trap names itself here, and the file states the ev
   `timeZone: 'Asia/Kuala_Lumpur'` — see `MYT_HOUR` in `popup.js`. Otherwise it disagrees with the
   strings next to it, for any viewer outside MYT. No `hour12` anywhere.
 - **leaflet.heat composites overlapping blobs, and both our layers plot an intensity, not a density.**
+  **Changed 2026-11-19 for RAIN.** The rain wash is an interpolated field, a normalised mean of every
+  gauge near each node, and it is not thinned. A normalised mean cannot stack. `thinHeat()` still
+  serves the water layer, and "any new heat layer must go through it" still holds for a layer on the
+  reach form. The text below describes the soft blobs of that form.
   Two gauges both reading 4 mm/h still means 4 mm/h, not 8. But the canvas accumulates alpha. So N
   stations reporting the same thing paint something stronger than any of them reported. Measured:
   233 rain gauges, a median of 4 inside one 5 km blob and up to 14. That stacked light rain (0.26)
@@ -1026,6 +1034,9 @@ order that file holds them. A trap names itself here, and the file states the ev
   under the ramp charged every glance for one decision. 75% is still the figure the control exists to
   reach. A pin, a river and a road all read through the wash, and the wash still states its own
   class. `HEAT_OPACITY` in `js/heat.js` holds the default and `PREFS.heatOpacity` holds the pick.
+  **The ceiling is 80%, since 2026-11-19.** A class carries a colour and no opacity of its own, so
+  this slider is the wash's only opacity control. `HEAT_OPACITY_MAX` in `js/heat.js` caps it, and a
+  stored value above the cap reads as the cap.
   **The floor is 20% and there is no zero.** A wash at zero is a layer switched off with its chip
   still stating a value, which is the chip contradicting the map. The heat chip's own `Off` is how a
   reader turns it off.
@@ -1037,7 +1048,10 @@ order that file holds them. A trap names itself here, and the file states the ev
   **It carries `autocomplete="off"` and `js/ui.js` writes it from the preference**, which is the rule
   every preference-owned control here obeys. A browser restores form state across a reload and fires
   no `change`.
-- **A heat layer's weight is its alpha.** leaflet.heat draws each point at its weight. So a scale
+- **A heat layer's weight is its alpha.** **Reversed on 2026-11-19.** The washes are classed. A
+  weight picks a class, a class is one flat colour, and one opacity serves every class. The weight
+  floor and the class edges still key on `RAIN_STOPS` and `levelStops()`. The next lines describe
+  the continuous wash that stood until then. leaflet.heat draws each point at its weight. So a scale
   that starts at 0 draws real readings as nothing. The water layer never hit this, because its floor
   is the alert slot (0.38). The rain layer's first class therefore *starts at 0.25* (`RAIN_STOPS`)
   rather than counting up from zero. Light rain is most of the rain most of the time. On the day it

@@ -290,8 +290,8 @@
      ramp — `RAIN_COLOR` is kind violet, then the alert amber above 30 mm an hour, then the danger
      red above 60. Kept declared for the reason `--s-trace` is: a rung cut out of a palette cannot go
      back without measuring the whole set again. Delete them the day somebody is sure.
-     `RAIN_HEAT` in `js/config.js` is NOT one of these. It holds the heat wash's own ramp as real
-     values, because a canvas cannot resolve a token, and it still draws. */
+     `RAIN_CLASSES` in `js/config.js` is NOT one of these. It holds the heat wash's own colours as
+     real values, because a canvas cannot resolve a token, and it still draws. */
   --k-rain-dry: #6a70ca; --k-rain-heavy: #c069ff;
   /* Third pass: all four spent down to the 3:1 floor exactly, measured on #efefef — the darkest paper
      the light basemap puts behind a mark. Red gained the most (L 0.583 → 0.655) because red has the

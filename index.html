@@ -570,6 +570,27 @@
      published, and it counts toward no station total. The temperature is a forecast for the day,
      not a thermometer, which is why the card states today.</p>
 
+  <!-- What the heatmap claims, in the words a reader can check against the code. When a change
+       touches a heat gate, a distance (INTERP_KM, COVER_KM, HEAT_KM) or a class edge, this copy and
+       the rain legend tip change with it, and so does the Status section of
+       docs/HEATMAP-WHITEPAPER.md change in the same commit. -->
+  <h3>Method</h3>
+  <p class="muted">The rain map is an estimate. Each point takes a mean of the rain gauges within 12 km,
+     and a nearer gauge counts for more. A gauge that reports no rain counts as zero. Ground more
+     than 10 km from every gauge stays bare. A storm cell is 1 to 2 km across, so a cell between two
+     gauges can be missing from the map.</p>
+  <p class="muted">The water map makes no estimate. It colors the ground within 5 km of a river or
+     flood gauge. A river level between two stations has no meaning. A reading older than one day
+     colors nothing on either map.</p>
+  <p class="muted">The rain colors are the intensity classes JPS uses. The map states no flood
+     forecast from rain, because no published rain threshold exists for a flash flood in the Klang
+     Valley.</p>
+  <div class="src">
+    <a href="https://github.com/illusionikx/selangor-flood-tracker/blob/main/docs/HEATMAP-WHITEPAPER.md"
+       target="_blank" rel="noopener">Heatmap method paper</a>
+    <span class="muted">The research behind the heatmap, with its sources and its open questions.</span>
+  </div>
+
   <h3>Credits</h3>
   <p class="muted">Built by <a href="https://github.com/illusionikx" target="_blank" rel="noopener">illusionikx</a>.
      Released under the <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT
@@ -666,7 +687,7 @@
     <li><i class="glyph i i-gradient"></i><span class="nm">Heatmap opacity<br
         ><span class="muted">Both heat layers use this value.</span></span
       ><span class="mslide"><b id="washPct"></b><input type="range" id="washOpacity"
-          min="20" max="100" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
+          min="20" max="80" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
   </ul>
 
   <!-- **One switch for every faulty-signal check**, on the repository owner's instruction of
@@ -1637,11 +1658,12 @@
           <p>Rivers and flood gauges both count. The station further up its own scale wins the
              spot.</p>
           <p>The color names the mark the station passed. Yellow is the alert mark. Orange is the
-             warning mark. Red is the danger mark. The station meter draws the same three marks.</p>
-          <p>A flood gauge at its danger mark goes straight to red. Water over a spot that floods is
-             an observation, not a forecast.</p>
+             warning mark. Red is the danger mark. The station meter draws the same three marks.
+             Between two marks the color steps through one more shade.</p>
+          <p>A flood gauge past its warning mark goes straight to red. Water over a spot that floods
+             is an observation, not a forecast.</p>
           <p>Below the alert mark, the map draws nothing. A map that is warm everywhere says
-             nothing.</p>
+             nothing. Each station speaks for 5 km. A reading older than one day colors nothing.</p>
           <p class="muted">Rainfall has its own layer and its own scale. Sirens and offline stations
              are not included.</p>
         </span>
@@ -1663,19 +1685,25 @@
         <span class="tip">
           <p><b>Calculation</b></p>
           <p>The scale shows the rain of the last hour, on the intensity classes JPS publishes.
-             Light is above 0 mm. Moderate is above 10 mm. Heavy is above 30 mm. Violent is above
-             60 mm.</p>
-          <p>Each class takes one color. A pin folds heavy rain into the alert amber and this scale
-             does not. Read the blob against this ramp, not against the pin on it.</p>
-          <p>Every rain gauge that reports counts. The map draws only rain that falls now. A dry
-             gauge draws nothing.</p>
+             Light is above 0 mm. Moderate is above 10 mm. Heavy is above 30 mm. Very heavy is
+             above 60 mm.</p>
+          <p>Each JPS class holds four shades, and very heavy holds one. The steps fall every 2.5 mm
+             up to 10 mm, every 5 mm up to 30 mm, and every 7.5 mm up to 60 mm. A pin folds heavy
+             rain into the alert amber and this scale does not. Read the wash against this ramp,
+             not against the pin on it.</p>
+          <p>The map estimates the rain between gauges. Each estimate is a mean of the gauges near
+             it, and a nearer gauge counts for more. A gauge that reports no rain counts as zero.
+             Ground more than 10 km from every gauge stays bare. A reading older than one day
+             counts for nothing.</p>
+          <p class="muted">A storm cell is 1 to 2 km across, so a cell between two gauges can be
+             missing from this map, and a cell over one gauge looks wider than it is.</p>
           <p class="muted">This is rain, not a flood. It shows where the water arrives, not where
              the water stands. The water level scale answers that.</p>
         </span>
       </span>
     </div>
     <div class="ramp rain"></div>
-    <div class="ticks muted"><span>light</span><span>moderate</span><span>heavy</span><span>violent</span></div>
+    <div class="ticks muted"><span>light</span><span>moderate</span><span>heavy</span><span>very heavy</span></div>
   </div>
   <!-- The weather key. THREE rungs, which is the whole of the nowcast's own vocabulary. It held
        five for a while: `Cloudy` and `Storm` came off the MET daily forecast, and the repository

@@ -267,6 +267,12 @@ try {
   ok('the names are over the ground and under the pins',
      z('labels') > z('tilePane') && z('labels') < z('overlayPane'),
      'tiles ' + z('tilePane') + ', labels ' + z('labels') + ', overlay ' + z('overlayPane'));
+  /* The heat wash has its own pane between the two, so a place name reads over it. Since 2026-11-19. */
+  ok('the heat wash is over the ground and under the names',
+     z('heat') > z('tilePane') && z('heat') < z('labels'),
+     'tiles ' + z('tilePane') + ', heat ' + z('heat') + ', labels ' + z('labels'));
+  ok('and no filter reaches the heat pane',
+     getComputedStyle(map.getPane('heat')).filter === 'none', 'filter ' + getComputedStyle(map.getPane('heat')).filter);
 
   say('');
   say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');

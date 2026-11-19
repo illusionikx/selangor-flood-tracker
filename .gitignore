@@ -29,3 +29,7 @@ node_modules/
 # The Playwright MCP server writes a console log and an accessibility tree here, with a session
 # timestamp in each file name. It writes new ones on every session, so the directory grows for ever.
 .playwright-mcp/
+
+# Research notes and the drafts behind docs/HEATMAP-WHITEPAPER.md
+research_notes/
+reports/

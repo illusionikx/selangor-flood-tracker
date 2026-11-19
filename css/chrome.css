@@ -2804,17 +2804,33 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    under it spread across. */
 #legend .ramp {
   height: 8px; border-radius: 999px; margin: 0;
-  /* The visible slice of the heat gradient — HEAT_ALERT to danger — so the warning stop lands at
-     (0.68 − 0.38) / (1 − 0.38). Change with heat.js's gradient and config.js's slots.
-     **FOUR rungs here against the pin's three, and that is settled.** The three-colour rule of
-     2026-08-26 covers a sensor, and this ramp describes a wash that paints ground. See RAIN_HEAT's
-     own comment in js/config.js for the argument, stated once. */
-  background: linear-gradient(90deg, #ffd166 0%, #ff9f1c 48%, #ff4d4d 100%);
+  /* **A class is one flat colour, so the ramp is hard stops and no blend.** The slice runs from
+     the alert mark to danger, so the warning stop lands at (0.68 − 0.38) / (1 − 0.38), which is
+     48.4%, and the two half steps at 24.2% and 74.2%. Red is the tail only, because that class
+     starts strictly above the danger mark.
+     Change with `WATER_CLASSES` in js/config.js. They are one scale in two places.
+     **Three classes here against the pin's two, and that is settled.** The three-colour rule of
+     2026-08-26 covers a sensor, and this ramp describes a wash that paints ground. */
+  background: linear-gradient(90deg, #ffd166 0 24.2%, #ffb847 24.2% 48.4%, #ff9f1c 48.4% 74.2%,
+                              #ff7a3d 74.2% 96%, #ff4d4d 96% 100%);
 }
-/* Rainfall's slice runs from the first class, so the four evenly-spaced RAIN_STOPS slots land on
-   thirds. Change with heat.js's rain gradient and config.js's RAIN_STOPS. */
+/* Rainfall's four JPS classes take quarters, which is how the evenly spaced `RAIN_STOPS` slots read.
+   The first three each hold four shades of 6.25%. Very heavy is open, so it holds one. Blue to
+   purple, with no red. Change with `RAIN_CLASSES` in js/config.js. */
 #legend .ramp.rain {
-  background: linear-gradient(90deg, #6f7bff 0%, #8f7bff 33.3%, #c77dff 66.7%, #ff4d4d 100%);
+  background: linear-gradient(90deg,
+    #b3cde3 0 6.25%, #a9bfdc 6.25% 12.5%, #9fb1d5 12.5% 18.75%, #95a3ce 18.75% 25%,
+    #8c96c6 25% 31.25%, #8c87bf 31.25% 37.5%, #8c77b7 37.5% 43.75%,
+    #8a67af 43.75% 50%, #8856a7 50% 56.25%, #87489c 56.25% 62.5%,
+    #863991 62.5% 68.75%, #842886 68.75% 75%, #810f7c 75% 100%);
+}
+/* The dark theme's own rain colours, light to bright. Change with `RAIN_CLASSES_DARK` in js/config.js. */
+:root[data-theme="dark"] #legend .ramp.rain {
+  background: linear-gradient(90deg,
+    #38688e 0 6.25%, #496e9d 6.25% 12.5%, #5873ac 12.5% 18.75%, #667aba 18.75% 25%,
+    #7380c8 25% 31.25%, #8c83d1 31.25% 37.5%, #a386db 37.5% 43.75%,
+    #b58be3 43.75% 50%, #c790eb 50% 56.25%, #d995f2 56.25% 62.5%,
+    #ec9af8 62.5% 68.75%, #f5a1fc 68.75% 75%, #ffa8ff 75% 100%);
 }
 /* Under the ramp and across its width. The first word starts at the ramp's start, the last ends at
    its end, and `gap` is the floor between two words on a narrow scale. */

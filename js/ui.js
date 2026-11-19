@@ -8,7 +8,7 @@ import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches,
 import { setTheme, applyTheme, flashTo, fitMarks, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere, findMe } from './locate.js';
 import { view, sync, navigate, rewrite } from './route.js';
-import { syncHeat, heatOpacity, HEAT_OPACITY } from './heat.js';
+import { syncHeat, heatOpacity, HEAT_OPACITY, HEAT_OPACITY_MAX } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
 import { render } from './render.js';
@@ -262,7 +262,8 @@ el('devForce').onclick = async () => {
    `heatOpacity()` is one style write per layer, so there is nothing here to throttle. */
 const wash = el('washOpacity'), washPct = el('washPct');
 const sayWash = () => { washPct.textContent = `${wash.value}%`; };
-wash.value = Math.round((PREFS.heatOpacity ?? HEAT_OPACITY) * 100);
+// A stored value above the cap, from before the cap, shows as the cap.
+wash.value = Math.round(Math.min(PREFS.heatOpacity ?? HEAT_OPACITY, HEAT_OPACITY_MAX) * 100);
 sayWash();
 wash.oninput = () => {
   PREFS.heatOpacity = +wash.value / 100;
