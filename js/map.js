@@ -342,7 +342,7 @@ const MARGIN = 0.1;
    by hand. **The box measures about 236 km north to south and 262 km east to west**, which is more
    ground than the circle it replaced. `map-limits-test.html` no longer compares the box to the
    circle. */
-const EXTRA = { n: 0.4, s: 0.2, w: 0.45, e: 0.55 };
+const EXTRA = { n: 0.4, s: 0.2, w: 0.6, e: 0.7 };
 
 /* The coverage box, once border.json has answered. **The three states are not the same.** While this
    is `undefined` the map asks for no tile at all. Once it is `false` the map asks for every tile. See
@@ -408,7 +408,15 @@ function clipLevel(layer, level) {
 function setLimits() {
   if (!cover) return;
   map.setMaxBounds(cover);
-  map.setMinZoom(map.getBoundsZoom(cover, true));
+  /* **THE FLOOR IS FRACTIONAL, SINCE 2026-11-23.** `getBoundsZoom()` rounds up to a whole level, so a
+     box that grew by 40% moved the floor nowhere. Leaflet snaps a requested zoom to `zoomSnap`
+     first and clamps to the floor after, so a fractional floor is reachable by one zoom-out press.
+     The box still covers the window on both axes, because this is the same fit without the round. */
+  const z = map.getBoundsZoom(cover, true);
+  const size = map.getSize();
+  const a = map.project(cover.getNorthWest(), z), b = map.project(cover.getSouthEast(), z);
+  const fit = Math.max(size.x / (b.x - a.x), size.y / (b.y - a.y));
+  map.setMinZoom(z + Math.log2(fit));
 }
 
 /* Fetched inline rather than deferred to an idle callback. It is 4 KB gzipped, and it carries the
