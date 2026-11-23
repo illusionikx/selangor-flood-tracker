@@ -95,9 +95,17 @@ try {
      pts.length + ' land points, ' + loose.length + ' outside');
 
   /* The other half of the same rule, stated the other way round. A box built from `bounds` passes the
-     assertion above and fails this one. */
-  ok('the box stops short of the maritime corner', cover.getWest() > geo.bounds[0],
-     'box west ' + cover.getWest().toFixed(4) + ', outline west ' + geo.bounds[0].toFixed(4));
+     assertion above and fails this one. **Rewritten 2026-11-23.** The owner widened the box in
+     `EXTRA`, so its west edge now lies past the outline's own west edge (100.1155 against 100.3875)
+     and "stops short of the maritime corner" is no longer true of any box. The fault it caught was a
+     box built from the wrong ring, so this reads that directly. Measured against the land ring's west
+     edge, a land-built box sits 0.71 degrees past it (`MARGIN` and `EXTRA.w`). A box built from
+     `bounds` also takes the 0.44 degrees between the two outlines and sits 1.2 past it. */
+  const landWest = Math.min(...pts.map(p => p[0]));
+  const westGap = landWest - cover.getWest();
+  ok('the box is built from the land ring and not the outline', westGap > 0.3 && westGap < 1,
+     'box west ' + cover.getWest().toFixed(4) + ' is ' + westGap.toFixed(3) + ' degrees past the land, '
+     + 'a box built from the outline would sit about 1.2 past it');
 
   /* This asserted "taller than wide" until 2026-10-19. The repository owner then asked for more
      ground on all four sides, and the box no longer passes it. The size is printed so a reader sees
@@ -146,14 +154,36 @@ try {
      zoom AFTER the animation settles: `getZoom()` answers the target the instant `setZoom()` is
      called, so a synchronous read reports a level the map never reached. */
   const floor = map.getMinZoom();
-  map.setZoom(floor - 3);
+  /* **Rewritten 2026-11-23, because the floor is fractional.** Leaflet limits a requested zoom twice
+     on a view that does not animate: `setView()` clamps it to the floor (8.89), and `_resetView()`
+     then runs the snap to `zoomSnap` over that result and rounds it to 9. So `setZoom()` without an
+     animation lands on 9, one level and 0.11 above the floor, and still on ground. An animated
+     zoom-out ends at the floor itself, and a live window reached 8.8897 that way. Headless Chrome's
+     virtual clock never fires `transitionend`, so this page cannot watch an animation finish. It
+     asserts the three things it can: the clamp answers the floor for a request far below it, the map
+     never goes under the floor, and a view that reached 9 still covers the window (the next check). */
+  map.setView(map.getCenter(), floor - 3, { reset: true });
   await stopped();
-  ok('the zoom floor holds', map.getZoom() === floor,
+  ok('the clamp answers the floor for a request far below it', map._limitZoom(floor - 3) === floor,
+     'asked for ' + (floor - 3) + ', the clamp gave ' + map._limitZoom(floor - 3) + ', floor is ' + floor);
+  ok('the zoom floor holds', map.getZoom() >= floor && map.getZoom() - floor < 1,
      'asked for ' + (floor - 3) + ', floor is ' + floor + ', landed on ' + map.getZoom());
 
   const box = map.options.maxBounds;
-  ok('the floor is the box', box && floor === map.getBoundsZoom(box, true),
-     'floor ' + floor + ', the box covers the window at ' + (box && map.getBoundsZoom(box, true)));
+  /* **The floor is the exact fit of the box to the window, not a whole level.** It was
+     `getBoundsZoom(box, true)` until 2026-11-23, which rounds up to a whole level. At the floor the
+     box must fill the window on one axis to the pixel and overfill it on the other, so the window
+     never shows bare container. The whole-level fit is the highest the floor can be, and the level
+     below it is the lowest. */
+  const fitAt = z => {
+    const a = map.project(box.getNorthWest(), z), b = map.project(box.getSouthEast(), z), s = map.getSize();
+    return [(b.x - a.x) - s.x, (b.y - a.y) - s.y];
+  };
+  const [slackX, slackY] = box ? fitAt(floor) : [NaN, NaN];
+  const whole = box && map.getBoundsZoom(box, true);
+  ok('the floor is the box', box && slackX >= -0.5 && slackY >= -0.5 && Math.min(slackX, slackY) < 0.5
+     && floor <= whole && floor > whole - 1,
+     'floor ' + floor.toFixed(3) + ', whole-level fit ' + whole + ', slack ' + slackX.toFixed(1) + ' x ' + slackY.toFixed(1) + ' px');
   ok('the pan box IS the coverage box', box && box.equals(cover),
      box ? box.toBBoxString() + ' against ' + cover.toBBoxString() : 'no maxBounds');
 
@@ -226,20 +256,26 @@ try {
   map.eachLayer(l => { if (l instanceof L.TileLayer) tileLayers.push(l); });
   const outside = (l, coords) => !cover.intersects(l._tileCoordsToBounds(coords));
 
-  /* The floor view has to reach past the box, or the assertion under it proves nothing. The box is
-     taller than this window, so the floor fits its height and leaves bare container to the left and
-     the right. Those strips are what spans tiles the box does not hold. */
-  let spanned = 0;
+  /* **No view can reach past the box any more, so this reads the tile rule directly.** It was a view
+     at the floor. The floor used to leave bare strips, and the tiles under them were the tiles the box
+     does not hold. The floor is the exact fit since 2026-11-23, and the pan limit is the box, so the
+     window never shows ground past it. A tile just past each edge must be refused, and one at the
+     centre must be accepted, or the assertion under this one proves nothing. */
   const t0 = tileLayers[0];
-  if (t0) {
-    const r = t0._pxBoundsToTileRange(map.getPixelBounds());
-    for (let x = r.min.x; x <= r.max.x; x++) for (let y = r.min.y; y <= r.max.y; y++) {
-      const c2 = L.point(x, y);
-      c2.z = t0._tileZoom;
-      if (outside(t0, c2)) spanned++;
-    }
-  }
-  ok('the floor view spans tiles outside the box', spanned > 0, spanned + ' of them');
+  const tileAt = (ll, z) => {
+    const p = map.project(L.latLng(ll), z), c2 = L.point(Math.floor(p.x / 256), Math.floor(p.y / 256));
+    c2.z = z;
+    return c2;
+  };
+  const probe = t0 && [
+    ['centre', cover.getCenter(), true],
+    ['west', [cover.getCenter().lat, cover.getWest() - 0.3], false],
+    ['east', [cover.getCenter().lat, cover.getEast() + 0.3], false],
+    ['north', [cover.getNorth() + 0.3, cover.getCenter().lng], false],
+    ['south', [cover.getSouth() - 0.3, cover.getCenter().lng], false],
+  ].map(([what, ll, want]) => [what, t0._isValidTile(tileAt(ll, 10)) === want]);
+  ok('the ground accepts a tile in the box and refuses one past each edge',
+     !!probe && probe.every(r => r[1]), probe ? probe.map(r => r[0] + (r[1] ? ' ok' : ' WRONG')).join(', ') : 'no tile layer');
   const asked = tileLayers.flatMap(l => Object.keys(l._tiles).map(k => [l, l._keyToTileCoords(k)]));
   const askedOut = asked.filter(([l, c2]) => outside(l, c2)).length;
   ok('no tile outside the box is asked for', asked.length > 0 && askedOut === 0,
