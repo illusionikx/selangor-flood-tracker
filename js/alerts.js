@@ -88,6 +88,11 @@ export function toggleAlerts() {
   side.key === KEY ? closeSide() : show();
 }
 
+// Opens the list and leaves it open if it already is. The ticker's district tile calls this.
+export function openAlerts() {
+  if (side.key !== KEY) show();
+}
+
 /* `toggle` does not bubble, so this listens in the capture phase. It fires for a press on a
    summary and for `syncOpen()` setting `open` alike, and both mean the same thing here. */
 document.addEventListener('toggle', e => {

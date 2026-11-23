@@ -1946,8 +1946,43 @@ Decisions:
   `MIN_TILES` counts it, the same as every other tile on the belt.
 - **Speed scales with the count.** One lap has to show everything, so a fixed pace means waiting a
   minute to find out whether your river is on the list when 40 stations are up. `pace()` ramps
-  `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5), capped at 2×: past that the
-  names stop being readable and the ticker is just motion.
+  `PX_PER_SEC` from 45 upward once the count passes `FAST_FROM` (5). **Since 2026-11-23 it reaches 3×
+  (135 px/s) at `BY_DISTRICT` (10), and no further.** It was 2× at 10 and stopped there. 135 px/s
+  is about 225 words per minute at 12px type. Studies of smooth scrolling text put readable speed at
+  250 to 300 words per minute. Comprehension drops a little at the fast end. Moving links are also
+  harder to press, so the cap stays under 4×.
+
+  | alerts | pace |
+  |---|---|
+  | 0 to 5 | 45 px/s |
+  | 6 | 63 px/s |
+  | 8 | 99 px/s |
+  | 10 | 135 px/s |
+  | 11 or more | district tiles, see below |
+- **Above 10 alerts the strip lists districts, and the stations stay in the panel. This reverses
+  "sorted, not grouped" for a long list, on 2026-11-23.** At 11 alerts on the live payload, one lap
+  of station tiles was 5,315 px. That took 59 seconds at the old cap. A tile averages about 370 px,
+  so 40 alerts make about 16,000 px and three minutes. Speed cannot fix that, because type past
+  about 3× is not readable. So the list gets shorter.
+  - **One tile per district** (`dkey()`, so two districts called Gombak stay apart), with one count
+    for each tier in that tier's colour: `Kuala Selangor · 4 happening now · 1 forecast`. The words
+    are the alert panel's own tags. A stale alert stays on the tile in grey as `not current`. A river
+    at its mark with dead telemetry must never drop off the strip.
+  - **A press opens the alert panel** (`openAlerts()`, which opens and never toggles). The tile
+    carries `data-open="alerts"` and no `data-go` and no `data-banner`, because it names no station.
+  - **District tiles keep the old, gentler ramp**, `n / FAST_FROM` capped at 2×, where `n` counts the
+    tiles. A tile holds several numbers and takes longer to read than a station name. 40 alerts in
+    8 districts is a lap of about 55 seconds.
+  - **The threshold is the ISA-18.2 flood figure, 10.** It is also where a lap passes 60 seconds.
+  - **It counts `hot`, never `items`.** A banner fills the strip and must not flip it. This is the
+    rule the advisory already follows.
+  - **The cost, accepted:** above 10 alerts a station name leaves the strip. The strip also changes
+    shape when the count crosses 10 between two polls.
+  - **Not built:** a press that also moves the map to the district. The panel is one press away and
+    holds the stations by tier.
+  - **Alert design standard:** this adds no alert surface and no new color. `isHot()` still decides
+    what counts. Each tier keeps its own color and word. The strip carries less detail and the same
+    claims.
 - **Fades, not hard edges.** 56px `mask` ramps on both sides, so items dissolve rather than being
   guillotined by the box. A marquee is always mid-item at both edges, so a short ramp there reads as
   a clipped word rather than one still coming into view.

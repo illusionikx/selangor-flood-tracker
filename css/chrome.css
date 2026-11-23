@@ -783,6 +783,10 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 #ticker .tk-brand .i { color: var(--accent); }
 #ticker .tk-brand b { font-weight: 500; color: var(--accent); }
 #ticker .tk-brand:hover b { color: var(--accent); text-decoration: none; }
+/* A district tile, drawn above BY_DISTRICT alerts. The glyph is neutral ink, never a kind colour:
+   one tile holds several kinds and several tiers, and the tier colour lives on each count. */
+#ticker .tk-dist .i { color: var(--muted); }
+#ticker .tk-dist .tk-sep { color: var(--outline); }
 #ticker .tk-dot { color: var(--outline); margin: 0 16px; }
 /* All-clear: centred, grey, still. It is the one card that is not a link and not news, so it reads
    as a label rather than an item that happens to be showing — and stillness is the message. */

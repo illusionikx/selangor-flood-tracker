@@ -17,16 +17,30 @@ import { state } from './state.js';
 import { el, isHot, dkey, tier, isIgnored, esc } from './util.js';
 import { flashTo } from './map.js';
 import { byId } from './stations.js';
+import { openAlerts } from './alerts.js';
 
 const PX_PER_SEC = 45;   // reading pace: slow enough to finish a station name, fast enough to cycle
 const FAST_FROM = 5;     // above this many alerts, wind it up — see pace()
+const BY_DISTRICT = 10;  // above this many alerts, one tile per district — see the `rows` block below
 const MIN_TILES = 3;     // fewest items on the strip before it is padded out by repetition
 const ADVISE_EVERY = 25; // alert items between hotline reminders; under this, once per set
 
 /* One lap has to show everything, so with a lot of alerts a fixed pace means waiting a minute to see
-   whether your river is on the list. Speed scales with the count from `FAST_FROM` up, capped at 2x:
-   past that the names stop being readable and the ticker is just motion. */
-const pace = n => PX_PER_SEC * Math.min(2, Math.max(1, n / FAST_FROM));
+   whether your river is on the list. Speed scales with the count from `FAST_FROM` up.
+   **Station tiles climb to 3x, and they reach it exactly at `BY_DISTRICT`.** That is 135 px/s, about
+   225 words per minute at this type size, inside the 250 to 300 that studies of scrolling text call
+   readable. Above `BY_DISTRICT` the strip stops listing stations, so this ramp never runs past
+   its own end.
+   Reaching 3x at 10 is the reason the slope is steeper than the old `n / FAST_FROM`, which gave 2x
+   at 10 and had nothing left to spend. */
+const pace = n => PX_PER_SEC * (1 + 2 * Math.min(1, Math.max(0, (n - FAST_FROM) / (BY_DISTRICT - FAST_FROM))));
+
+/* District tiles each carry several numbers, so they are slower to read than a station name and
+   they keep the old, gentler ramp: `n / FAST_FROM`, capped at 2x. The count is tiles on the strip. */
+const paceDistricts = n => PX_PER_SEC * Math.min(2, Math.max(1, n / FAST_FROM));
+
+// The words each tier prints on a district tile. The panel's own tags, so the two never disagree.
+const TIER_WORD = { now: 'happening now', heavy: 'heavy rain', soon: 'forecast', stale: 'not current' };
 
 /* Unfiltered by the district picker, like the toast and unlike the panel. The panel is a list you
    went looking at; this is ambient. A filter set to tidy the map is not a request to be told less
@@ -107,7 +121,39 @@ export function ticker() {
      reserves the traffic-light ramp for status, and a river's blue is what makes it a river. So the
      icon stays blue and the *reason* goes red for what is happening, amber for what is forecast,
      grey for what we can no longer vouch for. */
-  const items = banners.concat(hot.map(s => {
+  /* **Above `BY_DISTRICT` alerts the strip lists districts and not stations.** At 40 alerts one lap
+     of station tiles is about 16,000 px and three minutes, and a reader waits that long to learn
+     whether their own river is on it. Speed cannot fix that, because the type stops being readable
+     past about 3x. So the list gets shorter instead: one tile per district, with one count for each
+     tier, in that tier's colour. The stations stay in the alert panel, one press away.
+     This reverses "sorted, not grouped" for a long list only. A short list keeps every station as a
+     tile, and that is the case the old rule was written for.
+     It counts `hot` and never `items`, the rule the advisory below already states. A banner fills
+     the strip and must not flip it into district mode.
+     A district tile carries `data-open` and no `data-go` and no `data-banner`. It names no station,
+     so it opens the panel, which lists them. Counts never leave out a tier: the stale tier is on the
+     tile in grey, because a river at its mark with dead telemetry is the last thing to drop. */
+  const byDistrict = hot.length > BY_DISTRICT;
+  const districtTiles = () => {
+    const groups = new Map();
+    for (const s of hot) {
+      const k = dkey(s);
+      groups.has(k) ? groups.get(k).push(s) : groups.set(k, [s]);
+    }
+    return [...groups.values()].map(list => {
+      const n = {};
+      for (const s of list) n[tier(s)] = (n[tier(s)] || 0) + 1;
+      const parts = Object.keys(TIER_WORD).filter(t => n[t])
+        .map(t => `<span class="tk-why t-${t}">${n[t]} ${TIER_WORD[t]}</span>`);
+      return `<button class="tk-i tk-dist" data-open="alerts" tabindex="-1">
+        <i class="i i-place"></i>
+        <b>${esc(list[0].district || 'Unknown district')}</b>${parts.join('<span class="tk-sep">·</span>')}
+        <span class="tk-dot">•</span>
+      </button>`;
+    });
+  };
+
+  const items = banners.concat(byDistrict ? districtTiles() : hot.map(s => {
     const t = tier(s);
     const why = t === 'stale'      ? 'last known · not current'
       : s.kind === 'siren'         ? 'siren sounding'
@@ -188,7 +234,7 @@ export function ticker() {
   // Floored: measured before the webfont lands, `scrollWidth` can come back tiny, and a near-zero
   // duration is a strip that flickers rather than scrolls. The next poll re-measures anyway.
   run.style.setProperty('--dur',
-    `${Math.max(8, Math.round(one * reps / pace(items.length)))}s`);
+    `${Math.max(8, Math.round(one * reps / (byDistrict ? paceDistricts : pace)(items.length)))}s`);
 }
 
 // Delegated once: the strip is rebuilt on every poll and holds several copies of every station, so
@@ -205,6 +251,9 @@ export function ticker() {
    reader reaches a station from the one strip nothing covers. */
 el('ticker').onclick = e => {
   e.target.closest('button')?.blur();
+  // A district tile names no station. It opens the panel, which lists them. Open, never toggle: a
+  // press on a tile is a request to see the list, and a second press must not close it.
+  if (e.target.closest('[data-open="alerts"]')) return openAlerts();
   const t = byId(e.target.closest('[data-go]')?.dataset.go);
   if (t) flashTo(t);
 };
