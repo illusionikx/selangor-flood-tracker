@@ -8,7 +8,8 @@ import { el, distKm, ignoredIds, leads, favIds, isFav, squash, termsOf, matches,
 import { setTheme, applyTheme, flashTo, fitMarks, closeSide, showPlace, side, railSync } from './map.js';
 import { showHere, findMe } from './locate.js';
 import { view, sync, navigate, rewrite } from './route.js';
-import { syncHeat, heatOpacity, HEAT_OPACITY, HEAT_OPACITY_MAX } from './heat.js';
+import { syncHeat, heatOpacity, heatStyle, heat, rainHeat, minDefault, HEAT_OPACITY_TOP, HEAT_OPACITY,
+         HEAT_OPACITY_MAX } from './heat.js';
 import { byId } from './stations.js';
 import { camWarn } from './popup.js';
 import { render } from './render.js';
@@ -270,6 +271,56 @@ wash.oninput = () => {
   save();
   sayWash();
   heatOpacity();
+};
+
+/* **Stepped wash.** Off is flat: every band at `PREFS.heatOpacity`. On is stepped: the highest band
+   at `PREFS.heatOpacityTop` and the lowest at `PREFS.heatOpacityMin`. Each mode keeps its own values,
+   so a flip back finds the old ones. The lowest band never shows above the highest: heat.js clamps
+   it, and its row shows the clamp. The preference writes every control, never the reverse. */
+const stepBox = el('washStepped');
+const washTop = el('washTop'), washTopPct = el('washTopPct'), washMin = el('washMin'), washMinPct = el('washMinPct');
+const sayBands = () => {
+  const top = Math.min(PREFS.heatOpacityTop ?? HEAT_OPACITY_TOP, HEAT_OPACITY_MAX);
+  washTop.value = Math.round(top * 100);
+  washTopPct.textContent = `${washTop.value}%`;
+  // The two layers ship different lowest-band defaults. Until a reader moves this slider, it shows
+  // the default of the layer the heat chip names, rain or water.
+  const dflt = minDefault(PREFS.heatLayer === 'rain' ? rainHeat : heat);
+  washMin.value = Math.round(Math.min(PREFS.heatOpacityMin ?? dflt, top) * 100);
+  washMinPct.textContent = `${washMin.value}%`;
+};
+const sayStep = () => {
+  const on = stepBox.checked;
+  stepBox.closest('.msw').classList.toggle('on', on);
+  // A folded row must not take the focus, so it goes inert with the fold.
+  for (const [id, show] of [['washRow', !on], ['washTopRow', on], ['washMinRow', on]]) {
+    el(id).classList.toggle('shut', !show);
+    el(id).inert = !show;
+  }
+  sayBands();
+};
+// Stepped is the default since 2026-11-23, so only a stored 'flat' turns it off.
+stepBox.checked = PREFS.heatStyle !== 'flat';
+sayStep();
+stepBox.onchange = () => {
+  PREFS.heatStyle = stepBox.checked ? 'stepped' : 'flat';
+  sayStep();
+  save();
+  heatOpacity();
+  heatStyle();
+};
+washTop.oninput = () => {
+  PREFS.heatOpacityTop = +washTop.value / 100;
+  save();
+  sayBands();
+  heatOpacity();
+  heatStyle();
+};
+washMin.oninput = () => {
+  PREFS.heatOpacityMin = +washMin.value / 100;
+  save();
+  sayBands();
+  heatStyle();
 };
 
 /* **Hide faulty signals.** The preference writes the box, never the reverse, for the reason the wash

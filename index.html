@@ -102,14 +102,14 @@
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
 <link rel="stylesheet" href="vendor/fonts.css?v=52">
-<link rel="stylesheet" href="css/icons.css?v=107">
+<link rel="stylesheet" href="css/icons.css?v=108">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=204">
-<link rel="stylesheet" href="css/chrome.css?v=341">
-<link rel="stylesheet" href="css/map.css?v=189">
+<link rel="stylesheet" href="css/base.css?v=205">
+<link rel="stylesheet" href="css/chrome.css?v=342">
+<link rel="stylesheet" href="css/map.css?v=190">
 
 <!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
      Matter, in js/map.js, and went again on 2026-09-15. No markup here carries it. -->
@@ -687,10 +687,23 @@
 
   <h3>Map</h3>
   <ul id="mapList" class="picklist mlist">
-    <li><i class="glyph i i-gradient"></i><span class="nm">Heatmap opacity<br
-        ><span class="muted">Both heat layers use this value.</span></span
+    <!-- The switch comes first, because it decides which sliders show. On (the default since
+         2026-11-23): the highest band and the lowest band. Off: one opacity for every band. Each
+         mode keeps its own values. `js/ui.js` folds the rows from the preference. -->
+    <li><i class="glyph i i-gradient"></i><span class="nm">Stepped heatmap<br
+        ><span class="muted">Higher readings show stronger color</span></span
+      ><label class="msw"><input type="checkbox" id="washStepped" autocomplete="off"
+          aria-label="Stepped heatmap"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
+    <li id="washRow" class="fold"><i class="glyph"></i><span class="nm">Heatmap opacity<br
+        ><span class="muted">Same opacity for every band</span></span
       ><span class="mslide"><b id="washPct"></b><input type="range" id="washOpacity"
           min="20" max="80" step="5" autocomplete="off" aria-label="Heatmap opacity"></span></li>
+    <li id="washTopRow" class="fold"><i class="glyph"></i><span class="nm">Highest band opacity</span
+      ><span class="mslide"><b id="washTopPct"></b><input type="range" id="washTop"
+          min="20" max="80" step="5" autocomplete="off" aria-label="Highest band opacity"></span></li>
+    <li id="washMinRow" class="fold"><i class="glyph"></i><span class="nm">Lowest band opacity</span
+      ><span class="mslide"><b id="washMinPct"></b><input type="range" id="washMin"
+          min="0" max="80" step="5" autocomplete="off" aria-label="Lowest band opacity"></span></li>
   </ul>
 
   <!-- **One switch for every faulty-signal check**, on the repository owner's instruction of
@@ -700,7 +713,7 @@
   <h3>Alerts</h3>
   <ul id="alertSetList" class="picklist mlist">
     <li><i class="glyph i i-warning"></i><span class="nm">Hide faulty signals<br
-        ><span class="muted">A sensor that no nearby reading backs does not alert.</span></span
+        ><span class="muted">Ignore alerts that no nearby sensor confirms</span></span
       ><label class="msw"><input type="checkbox" id="hideFaulty" autocomplete="off"
           aria-label="Hide faulty signals"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
     <!-- The list the switch acts on. The count covers every faulty signal, whether the switch hides
@@ -729,7 +742,7 @@
     <!-- M3's switch, in the list's trailing slot. The row's own label is the headline and the
          warning sits on the supporting line, so the pill that used to carry both is gone. -->
     <li><i class="glyph i i-science"></i><span class="nm">Test mode<br
-        ><span class="muted">This mode fakes alerts in this browser only. Nothing reaches JPS.</span></span
+        ><span class="muted">Show a fake flood on this device only</span></span
       ><label class="msw"><input type="checkbox" id="testMode" autocomplete="off"
           ><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
     <!-- The readings table moved to a subpage on the repository owner's instruction of 2026-10-15. -->

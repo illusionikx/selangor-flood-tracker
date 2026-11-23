@@ -21281,3 +21281,21 @@ The plan is `docs/superpowers/plans/2026-11-19-water-interpolation.md`. The rese
 **Trade-offs accepted.** The wash is a picture of station state and not of water. A hill spreads a river's state over ground that may be on another river, and the legend says so. A flood gauge reaches as far as a river station, against the research advice that street flooding is hyperlocal, and one option on the layer changes it. A 12 px plateau round each station is the price of keeping its own class.
 
 **Not built.** A guard for tidal stations, which cross their marks with no rain. The research advised that a tidal station draw only at or above its own 24-hour high. The server holds that figure and the payload does not carry it, so it needs a server change. Interpolation along the river network, which is the correct method and needs river geometry the app does not hold. One tint for each district from its worst station, which is the most defensible area form and gives no rings.
+
+## The heatmap is tuned, and stepped by default (2026-11-23)
+
+**A tuning page.** `heat-tune.html` loads the app's own `js/heat.js` and shows one layer at a time over a fake map: the land ring from `border.json`, a grid of 0.1 degree, and the stations as dots. Each slider redraws at once and the page shows the redraw time. "Copy parameters" puts the values on the clipboard as JSON. The page writes layer options in memory only and never saves a preference. It is not a check and not part of the app.
+
+**Each layer carries its own numbers.** `smooth`, `sigma`, the grid cell, the opacities and five new knobs moved from module constants to layer options, so rain and water can differ. The five knobs are the distance power, the dry gauge weight, the nugget and outlier damping for rain, and the falloff power and overlap blend for water. Each default reproduced the old field exactly.
+
+**The owner's values.** Rain: `PRIOR_KM` 8, nugget 0.5. Water: falloff power 1.5, blend 0.1. Both: stepped, highest band 70%, lowest band 30% on rain and 35% on water. Water's lowest band is the alert yellow, and it reads weakly on a light map.
+
+**Two guards came with the values.** The blend is capped at the highest station in reach, so it never paints a class that no station reported. The nugget is held at the band floor within 1.5 cells of a gauge, so a gauge keeps its own colour at its own spot. Without that hold, a very heavy gauge dropped one or two bands and five checks in `heat-test.html` failed. The owner chose the hold over a nugget of 0.
+
+**Stepped is the default.** A higher band is more opaque. The canvas carries the highest band's opacity and each band is drawn at a share of it. A band's region is erased before it is filled, or the band under it would show through. Settings holds a switch and two sets of sliders. Flat has one opacity (`PREFS.heatOpacity`). Stepped has a highest and a lowest (`heatOpacityTop`, `heatOpacityMin`). Each mode keeps its own values, and the switch folds one set shut and opens the other. The lowest band never shows above the highest.
+
+**Timing.** On the test storm at zoom 11 in a 1300 x 800 window, water took 45 ms and rain 56 ms, medians of 9. A falloff power other than 2 or 1.5 calls `Math.pow` per pair and took over 80 ms, so 1.5 has a path of two square roots.
+
+**Trade-offs accepted.** Light rain spreads further than the 6 km correlation figure. A danger station colours its whole 10 km reach. The Settings lowest-band slider is one value for both layers, so it shows the default of the layer the heat chip names until a reader moves it.
+
+**Not built.** Outlier damping on water: the layer receives only stations past alert, so a lone alerting station has no calm neighbour to compare against.

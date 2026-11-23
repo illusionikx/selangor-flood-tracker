@@ -1312,6 +1312,15 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
    ponytail: a native input, not a transcribed M3 slider. Go to M3's own the day this needs a value
    label on the handle or a stepped track. The value sits beside it instead, because a wash a reader
    just set to 45% has to be a number they can go back to. */
+/* The stepped switch folds its opacity rows open and shut: one slider for flat, two for stepped.
+   M3's standard easing at a medium duration. */
+#settingsBox .mlist > li.fold {
+  max-height: 72px; overflow: hidden;
+  transition: max-height 300ms cubic-bezier(.2, 0, 0, 1), min-height 300ms cubic-bezier(.2, 0, 0, 1),
+              padding 300ms cubic-bezier(.2, 0, 0, 1), opacity 200ms linear;
+}
+#settingsBox .mlist > li.fold.shut { max-height: 0; min-height: 0; padding-block: 0; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #settingsBox .mlist > li.fold { transition: none; } }
 #settingsBox .mslide { flex: none; display: flex; align-items: center; gap: 8px; }
 #settingsBox .mslide input { width: 120px; accent-color: var(--accent); }
 #settingsBox .mslide b {

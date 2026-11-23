@@ -1,0 +1,293 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heat tuning</title>
+<!-- **Not a check and not part of the app.** A page for a person to tune one heatmap at a time and see
+     the wash change while a slider moves. Open https://flood-exp.test/heat-tune.html.
+     It loads the app's own `js/heat.js` and `js/map.js`, so what moves here is what ships. It writes
+     each layer's options in memory only. It never calls `save()`, so the app's own settings stay as
+     they are. Each layer has its own set of numbers.
+     "Copy parameters" puts the values on the clipboard as JSON, to send back to the maintainer.
+     A slider starts at the shipped value, and its reset button returns to it.
+     The map under the wash is fake: the land ring from `border.json`, a grid of 0.1 degree, and the
+     stations as dots. The real basemap needs the app's tile rules and CARTO. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+  :root { --bg: #fff; --fg: #1b1f24; --mute: #5f6b76; --line: #e3e7eb; --acc: #2563eb; --chg: #fff7e0; --field: #f4f6f8; }
+  :root[data-theme="dark"] { --bg: #1c2127; --fg: #e8ecef; --mute: #98a3ad; --line: #2f363e; --acc: #7aa7ff; --chg: #3a3220; --field: #262c33; }
+  html, body { margin: 0; height: 100%; font: 13px/1.35 system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; }
+  #tune { position: absolute; top: 10px; right: 10px; bottom: 10px; width: 360px; z-index: 1000;
+          display: flex; flex-direction: column; background: var(--bg); color: var(--fg);
+          border-radius: 14px; box-shadow: 0 4px 24px #0004; overflow: hidden; }
+  #tune.min { bottom: auto; }
+  #tune.min .body, #tune.min .foot { display: none; }
+  .head { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+  .title { display: flex; align-items: center; gap: 8px; }
+  .title b { font-size: 15px; flex: 1; }
+  .body { flex: 1; overflow: auto; padding: 4px 14px 12px; }
+  .foot { border-top: 1px solid var(--line); padding: 10px 14px; display: flex; gap: 8px; align-items: center; }
+  .foot .stat { margin-left: auto; color: var(--mute); font-variant-numeric: tabular-nums; }
+  .seg { display: flex; background: var(--field); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { flex: 1; border: 0; background: none; color: var(--fg); font: inherit; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+  .seg button.on { background: var(--bg); box-shadow: 0 1px 3px #0003; font-weight: 600; }
+  .seg.big button { padding: 8px; font-size: 14px; }
+  .opts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .opts label { display: flex; gap: 5px; align-items: center; background: var(--field); padding: 4px 9px; border-radius: 99px; cursor: pointer; user-select: none; }
+  .opts select { font: inherit; border: 0; background: var(--field); color: var(--fg); padding: 4px 8px; border-radius: 99px; }
+  h3 { margin: 14px 0 2px; font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary h3::after { content: ' ▸'; }
+  details[open] > summary h3::after { content: ' ▾'; }
+  .row { padding: 6px 8px; margin: 0 -8px; border-radius: 8px; }
+  .row.chg { background: var(--chg); }
+  .row .top { display: flex; align-items: center; gap: 6px; }
+  .row .lbl { flex: 1; }
+  .row .hint { color: var(--mute); font-size: 11px; }
+  .row input[type=number] { width: 64px; font: inherit; text-align: right; border: 1px solid var(--line); background: var(--field);
+                            color: var(--fg); border-radius: 6px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
+  .row input[type=range] { width: 100%; margin: 4px 0 0; accent-color: var(--acc); }
+  .row .rs { border: 0; background: none; color: var(--mute); cursor: pointer; font-size: 14px; padding: 0 2px; visibility: hidden; }
+  .row.chg .rs { visibility: visible; }
+  .row.sw { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .foot button { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--fg); padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+  .foot button.pri { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+  .icon { border: 0; background: none; color: var(--mute); cursor: pointer; font-size: 16px; }
+  pre { white-space: pre-wrap; font: 11px/1.3 ui-monospace, monospace; background: var(--field); padding: 8px; border-radius: 8px; }
+  #toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 1001; background: #222; color: #fff;
+           padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  @media (max-width: 700px) { #tune { left: 8px; right: 8px; top: auto; height: 58%; width: auto; } #tune.min { height: auto; } }
+</style>
+<div id="map"></div>
+<button id="sideClose" hidden></button>
+<dialog id="pane"></dialog>
+<div id="tune">
+  <div class="head">
+    <div class="title"><b>Heatmap tuning</b><button class="icon" id="min" title="Fold the panel">▾</button></div>
+    <div class="seg big" id="layerSeg"><button data-v="rain" class="on">Rainfall</button><button data-v="water">Water level</button></div>
+    <div class="opts">
+      <select id="src"><option value="live">Live data</option><option value="test">Test storm</option></select>
+      <label><input type="checkbox" id="dark"> Dark</label>
+      <label><input type="checkbox" id="bgOn" checked> Background</label>
+      <label><input type="checkbox" id="dots" checked> Stations</label>
+    </div>
+  </div>
+  <div class="body" id="rows"></div>
+  <div class="foot">
+    <button class="pri" id="copy">Copy parameters</button>
+    <button id="reset">Reset layer</button>
+    <span class="stat" id="stat">loading</span>
+  </div>
+</div>
+<div id="toast"></div>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet-heat.js"></script>
+<script type="module">
+const $ = id => document.getElementById(id);
+const stat = t => { $('stat').textContent = t; };
+const toast = t => { const e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 1600); };
+window.onerror = (m, f, l) => stat('ERROR ' + m + ' ' + f + ':' + l);
+window.onunhandledrejection = e => stat('ERROR ' + (e.reason && e.reason.message));
+
+const { map } = await import('./js/map.js');
+const { heat, rainHeat, heatOpacity, HEAT_OPACITY_TOP } = await import('./js/heat.js');
+const { RAIN_STOPS, FEED } = await import('./js/config.js');
+const { heatOk, waterValue, doubted, scalePos } = await import('./js/util.js');
+const { seedTest } = await import('./js/test.js');
+
+/* One set of numbers per layer. A row is [option, label, hint, min, max, step], or a switch when
+   min is null. `groundKm` follows `interpKm`, because the paint reach and the weight reach are one
+   distance. A layer's `opacity` and `stepped` options override the Settings controls for that layer. */
+const LAYER = { rain: rainHeat, water: heat };
+const SECTIONS = {
+  rain: [
+    ['Reach', [
+      ['interpKm', 'Gauge reach', 'km. How far one gauge counts.', 2, 30, 0.5],
+      ['priorKm', 'Pull to dry', 'km. Lower fades to no rain faster.', 1, 20, 0.5],
+      ['coverKm', 'Cover limit', 'km. Ground past this from every gauge stays bare.', 1, 30, 0.5],
+      ['floor', 'Floor', 'Least value drawn.', 0, 0.5, 0.005]]],
+    ['How gauges mix', [
+      ['power', 'Distance power', 'Stickiness. Higher: each gauge holds its own patch, with sharp steps. Lower: one soft field.', 0.5, 5, 0.1],
+      ['dryWeight', 'Dry gauge weight', 'How hard a gauge reading zero pulls. Lower lets rain spread past dry gauges.', 0, 3, 0.05],
+      ['nugget', 'Nugget', 'Trust in each reading. 0 shows each gauge exactly at its spot. Higher lets the field smooth over it.', 0, 1, 0.05],
+      ['outlier', 'Outlier damping', 'Pulls a gauge far above its neighbours toward their median. 1 is all the way.', 0, 1, 0.05],
+      ['outlierK', 'Neighbours compared', 'How many nearest gauges make the median.', 1, 12, 1]]],
+  ],
+  water: [
+    ['Reach', [
+      ['interpKm', 'Hill reach', 'km. A hill ends here.', 2, 30, 0.5],
+      ['priorKm', 'Half distance', 'km. A hill halves here. This sets the wash size most, because a station at its alert mark ends here.', 1, 20, 0.5],
+      ['floor', 'Floor', 'Least value drawn. 0.125 is half of the alert value.', 0, 0.5, 0.005]]],
+    ['How hills mix', [
+      ['hillPow', 'Hill falloff power', 'Higher: a flat dome with a steep edge. Lower: a sharp peak with a long tail.', 0.5, 6, 0.1],
+      ['blend', 'Overlap blend', 'Share of the other hills added to the highest. 0 is highest only. Above 0, nearby stations add up.', 0, 1, 0.05],
+      ['nugget', 'Nugget', 'Trust in each reading. 0 shows each station exactly at its spot. Higher lets the field smooth over it.', 0, 1, 0.05]]],
+  ],
+};
+const SHARED = [
+  ['Look', [
+    ['stepped', 'Stepped bands', 'Off is flat: one opacity for every band.', null],
+    ['opacity', 'Opacity', 'Flat: every band. Stepped: the highest band. The app caps it at 0.8.', 0.2, 0.8, 0.05],
+    ['opacityMin', 'Lowest band opacity', 'Stepped only. Never shows above the highest band.', 0, 0.8, 0.05]]],
+  ['Shape', [
+    ['smooth', 'Edge rounding', 'SMOOTH. Higher is rounder, and drifts from the data.', 0, 0.4, 0.005],
+    ['sigma', 'Field blur', 'INTERP_SIGMA. Higher removes small islands.', 0, 0.2, 0.0025]]],
+  ['Grid', [
+    ['cellDiv', 'Cell divisor', 'Cell px = reach / this. Higher is finer and slower.', 4, 40, 1],
+    ['cellMin', 'Smallest cell', 'px', 2, 24, 1],
+    ['cellMax', 'Largest cell', 'px', 4, 40, 1]], true],
+];
+// The shipped look, so each slider has a number to start on: stepped, from the layer's own lowest band to 70%.
+for (const l of Object.values(LAYER)) { l.options.opacity = HEAT_OPACITY_TOP; l.options.opacityMin = l.options.minDefault; l.options.stepped = true; }
+const DEF = {};
+for (const [name, l] of Object.entries(LAYER))
+  for (const [, rows] of [...SECTIONS[name], ...SHARED]) for (const [k] of rows) DEF[name + '.' + k] = l.options[k];
+
+let active = 'rain';
+const opts = () => LAYER[active].options;
+const fmt = v => typeof v === 'number' ? +v.toFixed(4) : v;
+
+/* Redraw the active layer once per frame, synchronously inside the frame, and time it. The stock
+   redraw also waits a frame, but it can skip one while Leaflet animates. This calls `_redraw()`. */
+let queued = false;
+const paint = () => {
+  if (queued) return;
+  queued = true;
+  requestAnimationFrame(() => {
+    queued = false;
+    heatOpacity();
+    const t = performance.now();
+    LAYER[active]._redraw();
+    stat(`redraw ${(performance.now() - t).toFixed(1)} ms`);
+  });
+};
+const setOpt = (k, v) => { const o = opts(); o[k] = v; if (k === 'interpKm') o.groundKm = v; };
+
+function build() {
+  const body = $('rows');
+  body.innerHTML = '';
+  for (const [title, rows, folded] of [...SECTIONS[active], ...SHARED]) {
+    const sec = document.createElement(folded ? 'details' : 'div');
+    sec.innerHTML = folded ? `<summary><h3>${title}</h3></summary>` : `<h3>${title}</h3>`;
+    for (const [k, label, hint, min, max, step] of rows) {
+      const row = document.createElement(min === null ? 'label' : 'div');
+      row.className = 'row' + (min === null ? ' sw' : '');
+      row.dataset.k = k;
+      row.innerHTML = min === null
+        ? `<input type="checkbox"><span class="lbl">${label}<br><span class="hint">${hint}</span></span><button class="rs" title="Back to shipped">↺</button>`
+        : `<div class="top"><span class="lbl">${label}</span><button class="rs" title="Back to shipped">↺</button>
+             <input type="number" min="${min}" max="${max}" step="${step}"></div>
+           <input type="range" min="${min}" max="${max}" step="${step}">
+           <div class="hint">${hint} Shipped: ${DEF[active + '.' + k]}</div>`;
+      const inputs = row.querySelectorAll('input');
+      const take = v => { setOpt(k, v); show(row); paint(); };
+      if (min === null) inputs[0].onchange = () => take(inputs[0].checked);
+      else for (const i of inputs) i.oninput = () => { if (i.value !== '') take(+i.value); };
+      row.querySelector('.rs').onclick = e => { e.preventDefault(); take(DEF[active + '.' + k]); };
+      show(row);
+      sec.append(row);
+    }
+    body.append(sec);
+  }
+}
+function show(row) {
+  const k = row.dataset.k, v = opts()[k], inputs = row.querySelectorAll('input');
+  for (const i of inputs) {
+    if (i.type === 'checkbox') i.checked = !!v;
+    else if (document.activeElement !== i) i.value = fmt(v);
+  }
+  row.classList.toggle('chg', fmt(v) !== fmt(DEF[active + '.' + k]));
+}
+
+function pick(name) {
+  active = name;
+  for (const b of $('layerSeg').children) b.classList.toggle('on', b.dataset.v === name);
+  for (const [n, l] of Object.entries(LAYER)) {
+    if (n === name && !map.hasLayer(l)) l.addTo(map);
+    if (n !== name && map.hasLayer(l)) map.removeLayer(l);
+  }
+  map.fire('zoomend');
+  build(); drawDots(); paint();
+}
+$('layerSeg').onclick = e => { const v = e.target.dataset.v; if (v && v !== active) pick(v); };
+$('min').onclick = () => { const m = $('tune').classList.toggle('min'); $('min').textContent = m ? '▸' : '▾'; };
+
+$('reset').onclick = () => {
+  for (const [, rows] of [...SECTIONS[active], ...SHARED]) for (const [k] of rows) setOpt(k, DEF[active + '.' + k]);
+  build(); paint(); toast('Layer reset to shipped values');
+};
+$('copy').onclick = async () => {
+  const out = {};
+  for (const [name, l] of Object.entries(LAYER)) {
+    const changed = {}, all = {};
+    for (const [, rows] of [...SECTIONS[name], ...SHARED]) for (const [k] of rows) {
+      all[k] = fmt(l.options[k]);
+      if (all[k] !== fmt(DEF[name + '.' + k])) changed[k] = all[k];
+    }
+    out[name] = { changed, all };
+  }
+  const text = JSON.stringify(out, null, 2);
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement('textarea'); t.value = text; document.body.append(t); t.select(); document.execCommand('copy'); t.remove(); }
+  toast('Parameters copied for both layers');
+};
+
+/* The fake basemap. Panes sit under the heat pane (250) and over it for the dots. */
+map.createPane('fakebg').style.zIndex = 200;
+map.createPane('fakedots').style.zIndex = 300;
+const bg = L.layerGroup().addTo(map), dotLayer = L.layerGroup().addTo(map);
+let land = null, stations = [];
+function drawBg() {
+  bg.clearLayers();
+  const on = $('bgOn').checked, dk = $('dark').checked;
+  map.getContainer().style.background = on ? (dk ? '#14181d' : '#bcd3e6') : (dk ? '#14181d' : '#f2f2f2');
+  if (!on) return;
+  if (land) L.geoJSON(land, { pane: 'fakebg', interactive: false,
+    style: { color: dk ? '#3a424c' : '#9aa5ad', weight: 1, fillColor: dk ? '#232a31' : '#eef0e8', fillOpacity: 1 } }).addTo(bg);
+  const line = { pane: 'fakebg', interactive: false, color: dk ? '#ffffff22' : '#00000018', weight: 1 };
+  for (let la = 2.4; la <= 4; la += 0.1) L.polyline([[la, 100.3], [la, 102.1]], line).addTo(bg);
+  for (let lo = 100.4; lo <= 102.1; lo += 0.1) L.polyline([[2.3, lo], [4, lo]], line).addTo(bg);
+}
+// Only the stations that feed the layer on screen: wet and dry gauges for rain, stations past alert for water.
+function drawDots() {
+  dotLayer.clearLayers();
+  if (!$('dots').checked) return;
+  const dk = $('dark').checked;
+  for (const s of stations) {
+    let fill;
+    if (active === 'rain' && s.kind === 'rainfall' && heatOk(s) && !doubted(s)) fill = s.hourly > 0 ? '#2563eb' : (dk ? '#6b7680' : '#9aa5ad');
+    else if (active === 'water' && (s.kind === 'river' || s.kind === 'gauge')) fill = waterValue(s) > 0 ? '#dc2626' : (dk ? '#6b7680' : '#9aa5ad');
+    if (!fill) continue;
+    L.circleMarker([s.lat, s.lng], { pane: 'fakedots', interactive: false, radius: 3, weight: 0.75,
+      color: dk ? '#000' : '#fff', fillColor: fill, fillOpacity: 1 }).addTo(dotLayer);
+  }
+}
+$('dark').onchange = e => { document.documentElement.dataset.theme = e.target.checked ? 'dark' : 'light'; drawBg(); drawDots(); };
+$('bgOn').onchange = drawBg;
+$('dots').onchange = drawDots;
+
+async function load() {
+  stat('loading stations');
+  const j = await (await fetch(FEED)).json();
+  stations = j.stations || [];
+  if ($('src').value === 'test') seedTest(stations);
+  const water = [], rain = [], dry = [];
+  for (const s of stations) {
+    const wv = waterValue(s);
+    if (wv > 0) water.push([s.lat, s.lng, wv]);
+    if (s.kind === 'rainfall' && heatOk(s) && !doubted(s))
+      s.hourly > 0 ? rain.push([s.lat, s.lng, scalePos(s.hourly, RAIN_STOPS) / 100]) : dry.push([s.lat, s.lng]);
+  }
+  heat.setLatLngs(water); rainHeat.setDry(dry); rainHeat.setLatLngs(rain);
+  drawDots(); paint();
+  toast(`${rain.length} wet gauges, ${dry.length} dry, ${water.length} water stations past alert`);
+}
+$('src').onchange = () => load().catch(e => stat('ERROR ' + e.message));
+
+fetch('border.json').then(r => r.json()).then(j => { land = j.features.find(f => f.properties.t === 'land'); drawBg(); });
+map.setView([3.14, 101.69], 11, { animate: false });
+drawBg();
+pick('rain');
+await load();
+</script>

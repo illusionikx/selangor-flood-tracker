@@ -52,11 +52,15 @@ const BASE = { radius: 70, blur: 55, maxZoom: 0 };
    at a pointed end and outward in a notch, and that is the price of a rounded corner.
    **The distance field must stay true out to 3 sigma beyond the reach**, or the blur drags the edge
    outward. Clamped at 8 px past the reach, a sigma of 16 px pushed a straight edge out by 3 px. */
-const SMOOTH = 0.1;
-
 /* The blur of the rain estimate, as a fraction of its reach `R`. It removes the ring target a weighted
-   mean draws round each gauge. See `_interp()`. */
-const INTERP_SIGMA = 0.05;
+   mean draws round each gauge. See `_interp()`.
+   **`LOOK` holds the shape and look numbers, and each layer carries its own copy in its options.**
+   `heat-tune.html` writes those options, one layer at a time. The app never does, so the values here
+   are the shipped ones. `opacity` and `stepped` are null on a layer that follows the Settings
+   controls. A number there overrides them for that layer alone. */
+const LOOK = { smooth: 0.1, sigma: 0.05, opacityMin: null, cellDiv: 12, cellMin: 8, cellMax: 16,
+               opacity: null, stepped: null,
+               power: 2, dryWeight: 1, nugget: 0, outlier: 0, outlierK: 4, hillPow: 2, blend: 0 };
 
 /* A node with no value to give, such as the cover margin of a layer that has none, holds this. */
 const BIG = 1e6;
@@ -172,6 +176,28 @@ function regionPath(F, cw, ch, S) {
 /* Bucket a list of `[x, y, ...]` points into a square grid of side `bs`, so a node tests its own
    bucket and the eight around it and not every point on the map. A bucket is addressed by
    `by * nbx + bx`, with one bucket of margin on every side. */
+/* Outlier damping for the rain layer. Each wet gauge is compared with the median of its `k` nearest
+   neighbours within `R`, dry gauges included as 0. A gauge above that median moves toward it by
+   `amount`, 0 to 1. A gauge below it stays: a low reading is not the spike this guards against.
+   A gauge with no neighbour stays too, because nothing contradicts it. O(n²) over the stations on
+   screen, which is about 400 at most. */
+function damp(pts, dry, R, amount, k) {
+  const all = pts.concat(dry.map(p => [p[0], p[1], 0])), r2 = R * R;
+  return pts.map(p => {
+    const near = [];
+    for (const q of all) {
+      if (q === p) continue;
+      const dx = p[0] - q[0], dy = p[1] - q[1], dd = dx * dx + dy * dy;
+      if (dd < r2) near.push([dd, q[2]]);
+    }
+    if (!near.length) return p;
+    near.sort((a, b) => a[0] - b[0]);
+    const v = near.slice(0, k).map(a => a[1]).sort((a, b) => a - b), m = v.length >> 1;
+    const med = v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+    return p[2] > med ? [p[0], p[1], p[2] - amount * (p[2] - med)] : p;
+  });
+}
+
 function bucket(list, bs, w, h) {
   const nbx = Math.ceil(w / bs) + 3, nby = Math.ceil(h / bs) + 3, bins = new Array(nbx * nby);
   for (let i = 0; i < list.length; i++) {
@@ -187,16 +213,31 @@ function bucket(list, bs, w, h) {
    `V` is the value that picks the class. `Fk` is the margin of class k: positive where the wash
    exists and the value is above that class's edge, scaled by `scale` so that a unit of value weighs
    about as much as a unit of distance. The lowest class is the whole wash. */
-function fillClasses(ctx, cls, F0, V, cw, ch, S, scale) {
-  const n = cw * ch, Fk = new Float32Array(n);
-  ctx.fillStyle = cls[0][1];
-  ctx.fill(regionPath(F0, cw, ch, S));
-  for (let k = 1; k < cls.length; k++) {
+function fillClasses(ctx, cls, F0, V, cw, ch, S, scale, lo) {
+  const n = cw * ch, Fk = new Float32Array(n), m = cls.length - 1;
+  /* STEPPED style (`PREFS.heatStyle`, 2026-11-23). The canvas carries the top band's opacity, and
+     class k is drawn at `lo + (1 - lo) * k / m` of it, where `lo` is the lowest band's opacity over
+     the top one's. So the lowest band shows at the lowest opacity and the top band at the top one. A class lies over the one below it, so the region is erased first.
+     Without the erase the lower colour would show through and mix. FLAT draws every class at 1. */
+  const paint = (k, F) => {
+    const path = regionPath(F, cw, ch, S);
+    if (lo !== null) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1;
+      ctx.fill(path);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = lo + (1 - lo) * k / m;
+    } else ctx.globalAlpha = 1;
+    ctx.fillStyle = cls[k][1];
+    ctx.fill(path);
+  };
+  paint(0, F0);
+  for (let k = 1; k <= m; k++) {
     const e = cls[k][0];
     for (let i = 0; i < n; i++) { const t = (V[i] - e) * scale; Fk[i] = F0[i] < t ? F0[i] : t; }
-    ctx.fillStyle = cls[k][1];
-    ctx.fill(regionPath(Fk, cw, ch, S));
+    paint(k, Fk);
   }
+  ctx.globalAlpha = 1;
 }
 
 const SoftHeat = L.HeatLayer.extend({
@@ -269,17 +310,26 @@ const SoftHeat = L.HeatLayer.extend({
        field is smooth at the scale of a cell, so a coarser grid costs no visible accuracy. A cell
        also sets the plateau round a station, 1.5 cells, which is why it must not grow on a short
        reach. */
-    const CELL = Math.max(8, Math.min(16, Math.round(R / 12))), O = CELL / 2;
+    const CELL = Math.max(this.options.cellMin, Math.min(this.options.cellMax, Math.round(R / this.options.cellDiv))), O = CELL / 2;
     const w = this._canvas.width, h = this._canvas.height;
     const cw = Math.ceil(w / CELL), ch = Math.ceil(h / CELL), n = cw * ch;
     const cls = classesFor(this);
     const o = this.options, maxMode = o.combine === 'max';
     const kmpx = R / o.interpKm, D0 = o.priorKm * kmpx, D02 = D0 * D0, covpx = o.coverKm * kmpx;
-    const sigma = INTERP_SIGMA * R, w0 = 1 / D02, r2 = R * R;
+    const SMOOTH = this.options.smooth, sigma = this.options.sigma * R, r2 = R * R;
+    /* Five tuning knobs, added 2026-11-23 for `heat-tune.html`. Each default reproduces the shipped
+       field exactly. `power` is the distance power of a rain weight, and `w0` follows it so that a
+       lone gauge still halves at `priorKm`. `dryWeight` scales a dry gauge's weight. `nugget` lets
+       the field leave a station's own value: 0 pins it, 1 leaves the blurred field alone.
+       `outlier` pulls a rain gauge toward the median of its neighbours. `hillPow` is the water
+       falloff power, and `blend` adds a share of the other hills to the highest one. */
+    const P = o.power ?? 2, HP = o.hillPow ?? 2, blend = o.blend ?? 0;
+    const w0 = 1 / Math.pow(D0, P), pin = 1 - (o.nugget ?? 0), dryW = o.dryWeight ?? 1;
     // True distance to the nearest gauge out past the cover margin and its blur, or the blur drags
     // the edge. The bucket is that wide, so a node always finds the gauge that sets its margin.
     const far = covpx * (1 + 3 * SMOOTH) + 2 * CELL, reach = Math.max(R, far);
-    const all = dry.length ? pts.concat(dry.map(p => [p[0], p[1], 0])) : pts;
+    if (!maxMode && o.outlier > 0) pts = damp(pts, dry, R, o.outlier, o.outlierK ?? 4);
+    const all = dry.length ? pts.concat(dry.map(p => [p[0], p[1], 0, dryW])) : pts;
     const { bins, nbx, nby } = bucket(all, reach, w, h);
 
     const V = new Float32Array(n), Vn = new Float32Array(n), Dm = new Float32Array(n), C = new Float32Array(n);
@@ -288,7 +338,7 @@ const SoftHeat = L.HeatLayer.extend({
       const py = gy * CELL + O, cby = Math.floor(py / reach) + 1;
       for (let gx = 0; gx < cw; gx++) {
         const px = gx * CELL + O, cbx = Math.floor(px / reach) + 1;
-        let sw = 0, swv = 0, dmin2 = Infinity, vn = 0, best = 0, bestV = 0, bestD = Infinity;
+        let sw = 0, swv = 0, dmin2 = Infinity, vn = 0, best = 0, bestV = 0, bestD = Infinity, hsum = 0, topV = 0;
         for (let by = cby - 1; by <= cby + 1; by++) {
           if (by < 0 || by >= nby) continue;
           for (let bx = cbx - 1; bx <= cbx + 1; bx++) {
@@ -300,19 +350,27 @@ const SoftHeat = L.HeatLayer.extend({
               if (maxMode) {
                 if (dd >= r2) continue;
                 const d = Math.sqrt(dd), t = d / R;
-                const hv = b[i][2] * (t > 0.5 ? ramp(t, 0.5) : 1) / (1 + dd / D02);
+                // Two square roots stand in for `pow` at the shipped 1.5, which is several times slower.
+                const s = dd / D02;
+                const q = HP === 2 ? s : HP === 1.5 ? Math.sqrt(s) * Math.sqrt(Math.sqrt(s)) : Math.pow(s, HP / 2);
+                const hv = b[i][2] * (t > 0.5 ? ramp(t, 0.5) : 1) / (1 + q);
+                hsum += hv;
+                if (b[i][2] > topV) topV = b[i][2];
                 if (hv > best) { best = hv; bestV = b[i][2]; bestD = d; }
                 continue;
               }
               if (dd < dmin2) { dmin2 = dd; vn = b[i][2]; }
               if (dd >= r2) continue;
-              const t = Math.sqrt(dd) / R, wgt = (t > 0.5 ? ramp(t, 0.5) : 1) / (dd + 1);
+              const t = Math.sqrt(dd) / R;
+              const wgt = (t > 0.5 ? ramp(t, 0.5) : 1) * (b[i][3] ?? 1) / ((P === 2 ? dd : Math.pow(dd, P / 2)) + 1);
               sw += wgt; swv += wgt * b[i][2];
             }
           }
         }
         const i = gy * cw + gx;
-        if (maxMode) { V[i] = best; Vn[i] = bestV; Dm[i] = bestD; continue; }
+        // The blend fills the gaps between stations, but it never goes above the highest station in
+        // reach. So it can never paint a class that no station reported.
+        if (maxMode) { V[i] = Math.min(topV, best + blend * (hsum - best)); Vn[i] = bestV; Dm[i] = bestD; continue; }
         const d = Math.sqrt(dmin2);
         V[i] = swv / (sw + w0); Vn[i] = vn; Dm[i] = d;
         C[i] = covpx - Math.min(d, far);
@@ -323,13 +381,20 @@ const SoftHeat = L.HeatLayer.extend({
     smoothGrid(Vs, cw, ch, sigma / CELL);
     const full = 1.5 * CELL, fade = Math.max(2 * sigma, full + CELL);
     for (let i = 0; i < n; i++) {
-      const d = Dm[i], gf = d <= full ? 1 : d >= fade ? 0 : 1 - (d - full) / (fade - full);
+      const d = Dm[i], gf = pin * (d <= full ? 1 : d >= fade ? 0 : 1 - (d - full) / (fade - full));
       Vs[i] += (Vn[i] - Vs[i]) * gf;
+      /* The nugget smooths over a station, but never out of its own band at its own spot. The owner
+         chose that on 2026-11-23: a reading keeps its colour where it was measured. Only the nodes
+         within the 1.5-cell plateau are held. A value above the band's lower edge is in the band. */
+      if (pin < 1 && d <= full && Vs[i] < Vn[i]) {
+        const k = classOf(Vn[i], cls);
+        if (k > 0) Vs[i] = Math.max(Vs[i], Math.min(Vn[i], cls[k][0] + 1e-4));
+      }
     }
     if (!maxMode) smoothGrid(C, cw, ch, SMOOTH * covpx / CELL);
     const F0 = new Float32Array(n);
     for (let i = 0; i < n; i++) { const e = (Vs[i] - o.floor) * R; F0[i] = e < C[i] ? e : C[i]; }
-    fillClasses(ctx, cls, F0, Vs, cw, ch, CELL, R);
+    fillClasses(ctx, cls, F0, Vs, cw, ch, CELL, R, stepRatio(this));
   },
 
   _redraw() {
@@ -368,10 +433,14 @@ const SoftHeat = L.HeatLayer.extend({
    its halving distance and its floor. The two layers differ because the two readings differ: a river
    level speaks for a catchment, an hour of rain speaks for a few streets. */
 export const heat = new SoftHeat([], {
-  ...BASE,
+  ...BASE, ...LOOK,
   groundKm: WATER_INTERP_KM,
   interp: true,
   interpKm: WATER_INTERP_KM, priorKm: WATER_PRIOR_KM, coverKm: 0, floor: RAIN_FLOOR, combine: 'max',
+  /* Tuned by the owner on 2026-11-23. A falloff power of 1.5 gives a hill a long tail, so a station
+     at danger colours its whole reach. A blend of 0.1 joins nearby hills so the wash is less spotty.
+     The blend is capped at the highest station in reach, so it never paints an unreported class. */
+  hillPow: 1.5, blend: 0.1, minDefault: 0.35,
   /* Classes are the thresholds, not arbitrary fractions: `waterValue()` in js/util.js scores each
      station by where it sits on its own alert / warning / danger scale, so yellow means "past
      alert", orange "past warning" and red "at danger" — the same reading the pin and the meter give,
@@ -393,10 +462,13 @@ export const heat = new SoftHeat([], {
    **It keeps thirteen classes while the rainfall pin draws three, and that is settled.** Do not
    fold a class to amber here. */
 export const rainHeat = new SoftHeat([], {
-  ...BASE,
+  ...BASE, ...LOOK,
   groundKm: INTERP_KM,
   interp: true,
   interpKm: INTERP_KM, priorKm: PRIOR_KM, coverKm: COVER_KM, floor: RAIN_FLOOR, combine: 'mean',
+  /* Tuned by the owner on 2026-11-23. A nugget of 0.5 lets the field smooth over a single gauge, so
+     one odd reading draws a softer bullseye. */
+  nugget: 0.5, minDefault: 0.3,
   classes: RAIN_CLASSES,
   dark: RAIN_CLASSES_DARK,
 });
@@ -454,9 +526,29 @@ function heatScale(paint = true) {
    stored value from before the cap reads as the cap. */
 export const HEAT_OPACITY = 0.75;
 export const HEAT_OPACITY_MAX = 0.8;
+/* Repaint both layers after the style preference changes. */
+export function heatStyle() { for (const l of LAYERS) l.redraw(); }
+/* The opacities of one layer. A layer option overrides the Settings value. The top is the slider
+   that existed before stepped mode, and it keeps its 80% cap. The lowest band never goes above it. */
+/* The stepped defaults, tuned by the owner on 2026-11-23. The highest band is 70% on both layers.
+   The lowest band is 30% on rain and 35% on water, because water's lowest band is the alert yellow
+   and it reads weakly on a light map. A reader's Settings value replaces both defaults. */
+export const HEAT_OPACITY_TOP = 0.7;
+export const minDefault = l => l.options.minDefault;
+// Stepped is the default since 2026-11-23, so only a stored 'flat' turns it off.
+const isStepped = l => l.options.stepped ?? PREFS.heatStyle !== 'flat';
+// Flat and stepped keep separate preferences: `heatOpacity` for flat, `heatOpacityTop` for stepped.
+const topOpacity = l => Math.min(l.options.opacity ?? (isStepped(l)
+  ? PREFS.heatOpacityTop ?? HEAT_OPACITY_TOP : PREFS.heatOpacity ?? HEAT_OPACITY), HEAT_OPACITY_MAX);
+// null for a flat layer, else the lowest band's opacity as a share of the top band's.
+function stepRatio(l) {
+  if (!isStepped(l)) return null;
+  const top = topOpacity(l), low = Math.min(l.options.opacityMin ?? PREFS.heatOpacityMin ?? minDefault(l), top);
+  return top > 0 ? low / top : 1;
+}
 export function heatOpacity() {
-  const o = Math.min(PREFS.heatOpacity ?? HEAT_OPACITY, HEAT_OPACITY_MAX);
-  for (const l of LAYERS) if (l._canvas) l._canvas.style.opacity = o;
+  for (const l of LAYERS)
+    if (l._canvas) l._canvas.style.opacity = topOpacity(l);
 }
 
 /* Puts the map, the legend and the segmented button on `PREFS.heatLayer`. One string

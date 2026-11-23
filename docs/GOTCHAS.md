@@ -2194,6 +2194,13 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   that a station keeps its class, that two stations at warning never add up, that water on the ground
   and a river at danger each keep their own class, that a lone hill is a circle, and that a day with
   no station past alert paints nothing.
+  **Changed 2026-11-23, on the owner's tuning.** The falloff power is 1.5, not 2, so a hill has a
+  long tail and a station at danger colours its whole 10 km reach. A value at the alert mark still
+  ends at 5 km, because the halving distance holds. **A blend of 0.1 adds a share of the other hills
+  to the highest one, and it is capped at the highest station in reach.** Without the cap, ten
+  nearby hills at warning added a whole danger step that no station reported. With it, two warnings
+  can join into one warning area and never into danger. Do not remove the cap. **Any falloff power
+  but 2 and 1.5 calls `Math.pow` per pair**, and that took the test storm past 80 ms.
 - **THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.** `SoftHeat._interp()` in
   `js/heat.js` takes a distance-weighted mean of the CLASS POSITION of every gauge within 12 km, wet
   and dry. **The prior is a constant weight on the value 0, and without it a lone wet gauge paints a
@@ -2211,6 +2218,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   one alpha channel. `heat-test.html` asserts a gauge keeps its class, a lone gauge falls with
   distance and ends at the cover limit, a dry gauge is bare, two gauges 50 m apart leave no hole and
   all-dry paints nothing.
+  **Changed 2026-11-23, on the owner's tuning.** `PRIOR_KM` is 8, so a lone gauge halves at 8 km and
+  light rain spreads further than the 6 km correlation figure. **The nugget is 0.5, and it is held
+  at the band floor.** The nugget weakens the put-back, so the field can smooth over one odd gauge.
+  At 0.5 alone it dropped a very heavy gauge one or two bands at its own spot, and five checks
+  failed. So within the 1.5-cell plateau the field never goes under the lower edge of the gauge's
+  own band. The gauge keeps its colour where it was measured, and the smoothing happens round it.
 - **THE WASH EDGE IS A CONTOUR OF A FIELD, AND FOUR THINGS BREAK IT SILENTLY.** `SoftHeat._field()`
   in `js/heat.js` samples fields on an 8 px grid and `regionPath()` draws the positive part of each
   as one path. **One path, never one per cell.** Two abutting antialiased fills leave a hairline

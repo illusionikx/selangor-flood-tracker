@@ -53,6 +53,10 @@ try {
   const { RAIN_CLASSES, WATER_CLASSES, RAIN_STOPS } = await import('./js/config.js');
   const { scalePos, heatOk, waterValue } = await import('./js/util.js');
   const { PREFS } = await import('./js/state.js');
+  /* The shape tests read alpha, so they run on the FLAT wash. Stepped is the app's default since
+     2026-11-23, and it lowers the alpha of every band under the top one. One test at the foot checks
+     the stepped wash on its own. */
+  PREFS.heatStyle = 'flat';
 
   const WET = [3.16, 101.75];
   const east = d => [WET[0], WET[1] + d / (111 * Math.cos(WET[0] * Math.PI / 180))];
@@ -341,6 +345,23 @@ try {
   ok('and below the cap it follows the slider', Math.abs(+rainHeat._canvas.style.opacity - 0.4) < 1e-6,
      'canvas opacity ' + rainHeat._canvas.style.opacity + ' from a stored 0.4');
   delete PREFS.heatOpacity;
+
+  /* The stepped wash. The canvas carries the top band's opacity, and the lowest band is drawn at
+     the lowest opacity over the top one. A lone light gauge paints the lowest class at its edge and
+     a very heavy one the top class at its centre. */
+  PREFS.heatStyle = 'stepped'; PREFS.heatOpacityTop = 0.7; PREFS.heatOpacityMin = 0.35;
+  heatOpacity();
+  rainHeat.setDry([]);
+  rainHeat.setLatLngs([[...WET, 1]]);
+  rainHeat._redraw();
+  const topA = pixAt(rainHeat, WET).a;
+  rainHeat.setLatLngs([[...WET, 0.3]]);
+  rainHeat._redraw();
+  const lowA = pixAt(rainHeat, WET).a;
+  ok('stepped: top band is opaque on the canvas', topA > 250, 'alpha ' + topA);
+  ok('stepped: lowest band is drawn at min / top', Math.abs(lowA - 255 * 0.5) < 6, 'alpha ' + lowA + ', wanted about 128');
+  ok('stepped: canvas carries the top opacity', Math.abs(+rainHeat._canvas.style.opacity - 0.7) < 1e-6, rainHeat._canvas.style.opacity);
+  PREFS.heatStyle = 'flat'; delete PREFS.heatOpacityTop; delete PREFS.heatOpacityMin;
 
   say('');
   say(fails.length ? 'FAILED: ' + fails.join(', ') : 'PASS');

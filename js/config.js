@@ -301,7 +301,8 @@ export const LEVEL_FLOOR = 6;
    weighted mean of the weights of every gauge near it, and a dry gauge counts as zero.
    **The three distances come from the measurement above, which still stands.** Given one gauge is
    wet, the chance its neighbour is wet too halves by 6 km and is back at the background rate by
-   12 km. So `PRIOR_KM` is 6, the distance at which a lone gauge's value falls to half, and
+   12 km. So `PRIOR_KM` was 6, the distance at which a lone gauge's value falls to half. The owner
+   tuned it to 8 on 2026-11-23 in `heat-tune.html`, so light rain spreads further than that figure. And
    `INTERP_KM` is 12, past which no gauge speaks. A convective cell is 1 to 2 km across, so every
    estimate between gauges is a guess, and the legend and About say so.
    `COVER_KM` is 10. Ground farther than that from every live gauge stays bare, because a map that
@@ -310,7 +311,7 @@ export const LEVEL_FLOOR = 6;
    `RAIN_FLOOR` is half way between a dry gauge (0) and the lightest rain (0.25). The wash exists
    where the estimate is above it. */
 export const INTERP_KM  = 12;
-export const PRIOR_KM   = 6;
+export const PRIOR_KM   = 8;
 export const COVER_KM   = 10;
 export const RAIN_FLOOR = 0.125;   // the wash floor, shared by both layers
 
