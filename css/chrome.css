@@ -2804,15 +2804,25 @@ body:has(#wxLayer:checked) :is(#heatChip, #kindChip, #alertChip, #favChip) { dis
    under it spread across. */
 #legend .ramp {
   height: 8px; border-radius: 999px; margin: 0;
-  /* **A class is one flat colour, so the ramp is hard stops and no blend.** The slice runs from
-     the alert mark to danger, so the warning stop lands at (0.68 − 0.38) / (1 − 0.38), which is
-     48.4%, and the two half steps at 24.2% and 74.2%. Red is the tail only, because that class
-     starts strictly above the danger mark.
+  /* **A class is one flat colour, so the ramp is hard stops and no blend.** Ten classes: four bands
+     from alert to warning, four from warning to danger, one at danger, and one for water on the
+     ground. The first eight take a twelfth each, so the warning mark lands at a third and the danger
+     mark at two thirds, which is where the three tick words fall. The last two take a sixth each.
      Change with `WATER_CLASSES` in js/config.js. They are one scale in two places.
-     **Three classes here against the pin's two, and that is settled.** The three-colour rule of
+     **Ten classes here against the pin's two, and that is settled.** The three-colour rule of
      2026-08-26 covers a sensor, and this ramp describes a wash that paints ground. */
-  background: linear-gradient(90deg, #ffd166 0 24.2%, #ffb847 24.2% 48.4%, #ff9f1c 48.4% 74.2%,
-                              #ff7a3d 74.2% 96%, #ff4d4d 96% 100%);
+  background: linear-gradient(90deg,
+    #ffd166 0 8.333%, #ffc557 8.333% 16.667%, #ffb847 16.667% 25%, #ffac35 25% 33.333%,
+    #ff9f1c 33.333% 41.667%, #ff8d31 41.667% 50%, #ff7a3d 50% 58.333%, #ff6546 58.333% 66.667%,
+    #ff4d4d 66.667% 83.333%, #a3122f 83.333% 100%);
+}
+/* Water on the dark theme differs in one class: water on the ground. Change with `WATER_CLASSES_DARK`
+   in js/config.js. The rain ramp has its own dark rule below. */
+:root[data-theme="dark"] #legend .ramp:not(.rain) {
+  background: linear-gradient(90deg,
+    #ffd166 0 8.333%, #ffc557 8.333% 16.667%, #ffb847 16.667% 25%, #ffac35 25% 33.333%,
+    #ff9f1c 33.333% 41.667%, #ff8d31 41.667% 50%, #ff7a3d 50% 58.333%, #ff6546 58.333% 66.667%,
+    #ff4d4d 66.667% 83.333%, #ffa3b8 83.333% 100%);
 }
 /* Rainfall's four JPS classes take quarters, which is how the evenly spaced `RAIN_STOPS` slots read.
    The first three each hold four shades of 6.25%. Very heavy is open, so it holds one. Blue to

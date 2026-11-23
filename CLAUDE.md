@@ -620,6 +620,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - "Gauge" in the rain heat entries below means a rainfall station.
 - A rain gauge reporting zero is a reading, and the rain heat layer draws it.
 - THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.
+- THE WATER WASH TAKES THE HIGHEST HILL, NEVER A MEAN.
 - THE WASH EDGE IS A CONTOUR OF A FIELD, AND FOUR THINGS BREAK IT SILENTLY.
 - THE WASH SHAPE IS SMOOTHED BY BLURRING ITS FIELD, NEVER ITS PICTURE.
 - THE WASH HAS A PANE OF ITS OWN AT 250, AND NO FILTER MAY REACH IT.
@@ -1011,10 +1012,11 @@ order that file holds them. A trap names itself here, and the file states the ev
   `timeZone: 'Asia/Kuala_Lumpur'` — see `MYT_HOUR` in `popup.js`. Otherwise it disagrees with the
   strings next to it, for any viewer outside MYT. No `hour12` anywhere.
 - **leaflet.heat composites overlapping blobs, and both our layers plot an intensity, not a density.**
-  **Changed 2026-11-19 for RAIN.** The rain wash is an interpolated field, a normalised mean of every
-  gauge near each node, and it is not thinned. A normalised mean cannot stack. `thinHeat()` still
-  serves the water layer, and "any new heat layer must go through it" still holds for a layer on the
-  reach form. The text below describes the soft blobs of that form.
+  **Reversed 2026-11-19 for BOTH layers.** Each wash is an interpolated field on a grid. Rain takes a
+  normalised mean of every gauge near a node and water takes the highest hill of the stations near
+  it. A mean cannot stack and a maximum cannot add, so no layer is thinned and `thinHeat()` is
+  deleted with the reach form. "Any new heat layer must go through it" no longer holds. The text
+  below describes the soft blobs of that form and is kept as history.
   Two gauges both reading 4 mm/h still means 4 mm/h, not 8. But the canvas accumulates alpha. So N
   stations reporting the same thing paint something stronger than any of them reported. Measured:
   233 rain gauges, a median of 4 inside one 5 km blob and up to 14. That stacked light rain (0.26)

@@ -294,7 +294,6 @@ export const LEVEL_FLOOR = 6;
    4 km, halves to 13% by 6 km, and is back to the 5% background rate by 12 km. So no rain claim
    survives 12 km, and the halving distance is 6. A convective cell over the Klang Valley is 1 to
    2 km across. `MET_KM` in api.php reasons the same way about a MET point. */
-export const HEAT_KM     = 5;      // water level
 /* **THE RAIN WASH IS AN INTERPOLATED FIELD, AND THE OWNER DECIDED THAT ON 2026-11-19.** It was one
    disc of `RAIN_KM` (6 km) around each gauge, with a straight halfway line between a wet gauge and a
    dry one. The owner showed a weather-model map and asked for a continuous field of narrow bands,
@@ -313,7 +312,27 @@ export const HEAT_KM     = 5;      // water level
 export const INTERP_KM  = 12;
 export const PRIOR_KM   = 6;
 export const COVER_KM   = 10;
-export const RAIN_FLOOR = 0.125;
+export const RAIN_FLOOR = 0.125;   // the wash floor, shared by both layers
+
+/* **THE WATER WASH IS AN INTERPOLATED FIELD OF HILLS, AND THE OWNER DECIDED THAT ON 2026-11-19.** It
+   was one disc of 5 km (`HEAT_KM`, deleted) round each station past its alert mark. See `_interp()`
+   in heat.js for how stations combine, and why water takes the HIGHEST hill where rain takes a mean.
+   A station's hill is its value, halved at `WATER_PRIOR_KM` (5, which is the reach a station at its
+   alert mark had before) and ended at `WATER_INTERP_KM` (10). There is no cover margin: a hill ends
+   where it falls under `RAIN_FLOOR`, so a station exactly at its alert mark colours 5 km.
+   **The value scale.** Each station is scored against its OWN marks, then mapped onto one scale so
+   that a river and a flood gauge share it: nothing under the alert mark, 0.25 at the alert mark,
+   0.625 at the warning mark and 1 at the danger mark. A flood gauge with water over its warning mark
+   takes `WATER_GROUND_V`, 1.25, which is water MEASURED on the ground and outranks a river at its
+   danger mark, which is a warning that a flood could come. Japan keeps a level above its highest
+   warning for "a disaster has occurred" for the same reason. `waterValue()` in util.js is the one
+   function that scores a station. */
+export const WATER_INTERP_KM = 10;
+export const WATER_PRIOR_KM  = 5;
+export const WATER_ALERT_V   = 0.25;
+export const WATER_WARNING_V = 0.625;
+export const WATER_DANGER_V  = 1;
+export const WATER_GROUND_V  = 1.25;
 /* Heat weight is a position on the threshold scale, not a fraction of danger. The popup meter's
    piecewise slots (alert 38%, warning 68%, danger 100%) key straight into the gradient, so a blob's
    colour names the band a station crossed. The floor is the alert slot: below its first published
@@ -322,11 +341,6 @@ export const RAIN_FLOOR = 0.125;
 export const HEAT_ALERT   = 0.38;
 export const HEAT_WARNING = 0.68;
 export const HEAT_FLOOR   = HEAT_ALERT;
-/* Widest sprite one blob may be drawn at. Blur cost is quadratic, so past this the layer fades
-   rather than quietly covering less ground. It reads 400 and not 220 because it now caps the whole
-   painted circle, where it used to cap only the solid core and simpleheat added 80% more blur
-   outside it — 220 there was 396 on the canvas. 400 is the same sprite and the same cost. */
-export const HEAT_MAX_PX = 400;
 
 /* Rainfall heat, on JPS's own intensity classes (`rainStatus()` in sources.php: >0 light, >10
    moderate, >30 heavy, >60 very heavy, mm in the last hour). The slots are evenly spaced because
@@ -340,33 +354,41 @@ export const HEAT_MAX_PX = 400;
 export const RAIN_STOPS = [[0, 25], [10, 50], [30, 75], [60, 100]];
 
 /* **THE TWO WASHES ARE CLASSED, AND THE OWNER SETTLED THAT ON 2026-11-19.** Each class draws as one
-   flat colour at its own opacity, with a crisp edge at the reach. It replaced a continuous gradient
-   with a soft rim, which carried the class, the reading and the distance from the gauge in one
-   alpha channel. See `docs/HEATMAP-WHITEPAPER.md` for the research behind the change.
-   A class is `[edge, hex]`. A weight takes the LAST class whose edge it is strictly above, so a
+   flat colour, and the Settings slider alone sets the opacity. It replaced a continuous gradient with
+   a soft rim, which carried the class, the reading and the distance from the gauge in one alpha
+   channel. See `docs/HEATMAP-WHITEPAPER.md` for the research behind the change.
+   A class is `[edge, hex]`. A value takes the LAST class whose edge it is strictly above, so a
    reading sitting on an edge stays in the class below it. That matches JPS: moderate is "above 10",
-   which is weight 0.5 here. The edges are the weights `RAIN_STOPS` and `levelStops()` produce, and
-   `0.999` is the open top class, because a full-scale weight is exactly 1.
+   which is weight 0.5 here. The rain edges are the weights `RAIN_STOPS` produces. The water edges are
+   values on the scale above. The open top class of rain is 0.995 and not 0.999, because an
+   interpolated estimate reaches 1 only in the limit: at a gauge reading 60 mm or more it is 0.9987
+   at the nearest grid node, and 0.999 would never paint the top class.
    Rain is ColorBrewer BuPu, light to dark, with no warm hue, so red means status and nothing else.
-   Water keeps yellow at alert, orange at warning and red at danger, the same marks the station
-   meter draws.
-   **Rain has thirteen classes and water has five, and the owner asked for both on 2026-11-19.**
+   **Rain has thirteen classes and water has ten, and the owner asked for both on 2026-11-19.**
    Every JPS class is split into quarters, and every new colour is the OKLab midpoint of its two
-   neighbours, so the seven colours that stood before stay where they were. The top class is open and
-   cannot split. The edges, in mm an hour: 0, 2.5, 5, 7.5, 10, 15, 20, 25, 30, 37.5, 45, 52.5 and
-   above 60. Water has five: alert, half way to warning, warning, half way to danger and danger. The
-   cost is real: one study read 91.9% correct on four classes and 68.2% on eight. Neighbour bands
-   differ by at least 1.14:1 in luminance on the light theme and 1.08:1 on the dark one, so a band
-   edge is visible and no more. The legend keeps the four JPS words under their own edges, so a
-   reader still finds the class by name.
-      by name. **This is one scale in three places: here, the two `.ramp` rules in css/chrome.css, and
-   the tick words in index.html.** They move together. */
+   neighbours, so the seven rain colours that stood before stay where they were. The top rain class
+   is open and cannot split. The rain edges, in mm an hour: 0, 2.5, 5, 7.5, 10, 15, 20, 25, 30, 37.5,
+   45, 52.5 and above 60. Water runs four bands from alert to warning, four from warning to danger,
+   one at danger, and one above it for water on the ground. The band that starts at a mark takes that
+   mark's colour: yellow at alert, orange at warning, red at danger.
+   The cost is real: one study read 91.9% correct on four classes and 68.2% on eight. Neighbour
+   bands differ by at least 1.14:1 in luminance on the light theme and 1.08:1 on the dark one for
+   rain, and by at least 1.09:1 for water, so a band edge is visible and no more. The legend keeps
+   the JPS words under their own edges, so a reader still finds the class by name.
+   **This is one scale in three places: here, the `.ramp` rules in css/chrome.css, and the tick
+   words in index.html.** They move together. */
 export const RAIN_CLASSES  = [[0, '#b3cde3'], [0.3125, '#a9bfdc'], [0.375, '#9fb1d5'], [0.4375, '#95a3ce'],
                               [0.5, '#8c96c6'], [0.5625, '#8c87bf'], [0.625, '#8c77b7'], [0.6875, '#8a67af'],
                               [0.75, '#8856a7'], [0.8125, '#87489c'], [0.875, '#863991'], [0.9375, '#842886'],
                               [0.995, '#810f7c']];
-export const WATER_CLASSES = [[0, '#ffd166'], [0.53, '#ffb847'], [HEAT_WARNING, '#ff9f1c'],
-                              [0.84, '#ff7a3d'], [0.999, '#ff4d4d']];
+export const WATER_CLASSES = [[0, '#ffd166'], [0.34375, '#ffc557'], [0.4375, '#ffb847'], [0.53125, '#ffac35'],
+                              [0.625, '#ff9f1c'], [0.71875, '#ff8d31'], [0.8125, '#ff7a3d'], [0.90625, '#ff6546'],
+                              [0.995, '#ff4d4d'], [1.12, '#a3122f']];
+/* Water on the dark theme differs in one class. The darkest red, water on the ground, read 4.4:1 on a
+   light ground and only 1.6:1 on a dark one, so the dark theme takes a pale pink (5.5:1 on a dark
+   land of #1d2026 at 75% opacity, and 1.65:1 against the danger red beside it). Every other class
+   reads 3.3:1 or more on a dark ground. The ground colour is assumed, not sampled. */
+export const WATER_CLASSES_DARK = WATER_CLASSES.map((c, i) => i === WATER_CLASSES.length - 1 ? [c[0], '#ffa3b8'] : c);
 /* **The rain colours on the dark theme, which are their own set since 2026-11-19.** On a dark ground
    the light set inverts: light rain read at about 6:1 and very heavy rain at about 1.5:1, so the
    class that matters most was the one least visible. These keep each light colour's hue, and run in

@@ -571,7 +571,7 @@
      not a thermometer, which is why the card states today.</p>
 
   <!-- What the heatmap claims, in the words a reader can check against the code. When a change
-       touches a heat gate, a distance (INTERP_KM, COVER_KM, HEAT_KM) or a class edge, this copy and
+       touches a heat gate, a distance (INTERP_KM, COVER_KM, WATER_INTERP_KM) or a class edge, this copy and
        the rain legend tip change with it, and so does the Status section of
        docs/HEATMAP-WHITEPAPER.md change in the same commit. -->
   <h3>Method</h3>
@@ -579,9 +579,12 @@
      and a nearer gauge counts for more. A gauge that reports no rain counts as zero. Ground more
      than 10 km from every gauge stays bare. A storm cell is 1 to 2 km across, so a cell between two
      gauges can be missing from the map.</p>
-  <p class="muted">The water map makes no estimate. It colors the ground within 5 km of a river or
-     flood gauge. A river level between two stations has no meaning. A reading older than one day
-     colors nothing on either map.</p>
+  <p class="muted">The water map shows the state of the stations near a point. A river or flood gauge
+     past its alert mark colors the ground around it, strongest at the station and fading to nothing
+     at 10 km. Where two stations reach the same ground, the higher one shows. The color is not the
+     edge of a flood. The darkest color is water measured on the ground by a flood gauge.</p>
+  <p class="muted">A station under its alert mark colors nothing and lowers nothing. A reading older
+     than one day colors nothing on either map.</p>
   <p class="muted">The rain colors are the intensity classes JPS uses. The map states no flood
      forecast from rain, because no published rain threshold exists for a flash flood in the Klang
      Valley.</p>
@@ -1654,27 +1657,28 @@
         <span class="tip">
           <p><b>Calculation</b></p>
           <p>Each station scores its reading against its <i>own</i> marks. A small stream at its
-             limit draws the same color as a big river at its limit.</p>
-          <p>Rivers and flood gauges both count. The station further up its own scale wins the
-             spot.</p>
-          <p>The color names the mark the station passed. Yellow is the alert mark. Orange is the
-             warning mark. Red is the danger mark. The station meter draws the same three marks.
-             Between two marks the color steps through one more shade.</p>
-          <p>A flood gauge past its warning mark goes straight to red. Water over a spot that floods
-             is an observation, not a forecast.</p>
-          <p>Below the alert mark, the map draws nothing. A map that is warm everywhere says
-             nothing. Each station speaks for 5 km. A reading older than one day colors nothing.</p>
+             limit counts the same as a big river at its limit. Rivers and flood gauges both count.</p>
+          <p>A station past its alert mark colors the ground around it. The color is strongest at
+             the station and falls with distance, to nothing at 10 km. Where two stations reach the
+             same ground, the higher one shows. The color never adds up.</p>
+          <p>Yellow is the alert mark. Orange is the warning mark. Red is the danger mark. The
+             station meter draws the same three marks. Between two marks the color steps through
+             more shades.</p>
+          <p>The darkest color is water on the ground: a flood gauge with water over its warning
+             mark. That is a measurement, not a forecast.</p>
+          <p>A station under its alert mark colors nothing, and it lowers nothing. A reading older
+             than one day counts for nothing.</p>
+          <p class="muted">The color shows the state of the stations near a point. It is not the
+             edge of a flood.</p>
           <p class="muted">Rainfall has its own layer and its own scale. Sirens and offline stations
              are not included.</p>
         </span>
       </span>
     </div>
     <div class="ramp"></div>
-    <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
-         under it is in the tip — the panel is a legend, not a page. -->
-    <!-- The three marks themselves, in the order the ramp crosses them. The prose that used to sit
-         under it is in the tip — the panel is a legend, not a page. -->
-    <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span></div>
+    <!-- The three marks and the class above them, in the order the ramp crosses them. The prose
+         that used to sit under it is in the tip — the panel is a legend, not a page. -->
+    <div class="ticks muted"><span>alert</span><span>warning</span><span>danger</span><span>flooded</span></div>
   </div>
   <!-- Rainfall's own scale, drawn only while that layer is on. Separate section rather than a second
        panel: exactly one layer is ever on, and two floating boxes on a phone is one too many. -->

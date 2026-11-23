@@ -2176,6 +2176,24 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   replace any of this with interpolation. A dry gauge can deny
   ground, never supply a value. See `docs/FEATURES.md`, *The rainfall heatmap claimed rain over
   250 km² from one gauge*.
+- **THE WATER WASH TAKES THE HIGHEST HILL, NEVER A MEAN.** `SoftHeat._interp()` in `js/heat.js` has
+  two ways to combine stations, and rain takes the mean while water takes the maximum
+  (`combine: 'max'`). **Why a mean is wrong for a river.** Rain is one field, so a mean of gauges is
+  a fair guess. A river level belongs to one channel. A mean painted classes between a danger station
+  and a calm one that no sensor reported, and let a calm river lower a danger reading on a different
+  river. The research found no service that draws an area between water sensors. **A calm station
+  is absent, not zero.** `render()` sends only stations that `waterValue()` scores above 0, and the
+  layer has no dry list. **A hill is `value / (1 + (d / D0)²)` with a taper to zero at 10 km**, so a
+  station exactly at its alert mark colours 5 km, which is the reach it had as a disc. **The put-back
+  uses the station whose hill wins at the node**, so a higher neighbour is never lowered to a lower
+  station's own value. **A value goes up to 2 in `_redraw()`.** A clamp at 1 once flattened water on
+  the ground (1.25) into danger. **Water on the ground is `WATER_GROUND_V` and outranks a river at
+  danger.** A measured flood is not a forecast of one. **The dark theme has its own top class**,
+  because the darkest red read 1.6:1 on a dark ground. A doubted flood gauge enters nothing: it
+  used to paint by its depth, with only its jump to the top class gated. `heat-test.html` asserts
+  that a station keeps its class, that two stations at warning never add up, that water on the ground
+  and a river at danger each keep their own class, that a lone hill is a circle, and that a day with
+  no station past alert paints nothing.
 - **THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.** `SoftHeat._interp()` in
   `js/heat.js` takes a distance-weighted mean of the CLASS POSITION of every gauge within 12 km, wet
   and dry. **The prior is a constant weight on the value 0, and without it a lone wet gauge paints a
@@ -2395,7 +2413,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `heatScale()`.
   The comment on the `map.on('zoomend', …)` line stated this rule while the code broke it. A stale
   comment is not evidence. Count the calls to `_redraw()` against the count of `zoomend`.
-- **The water layer has no denial and must not get one, and everything else it shares.** Both layers
+- **The water layer has no denial and must not get one, and everything else it shares.**
+  **Reversed in part on 2026-11-19.** The reach form that both layers shared is deleted, and both
+  layers are interpolated fields. The rule behind this entry still holds in a new form: a calm
+  station lowers nothing, because the water wash takes the highest hill and a calm station draws no
+  hill at all. `BLEND`, `FEATHER`, `GATE` and `setDry()` for water are gone. The body below describes
+  the reach form and is kept as history. Both layers
   are `SoftHeat`. So the field render, `BLEND`, `FEATHER`, the clamped-sum coverage and the bucket
   index are one implementation and reach both. Only `setDry()` is called on one of them, from
   `render.js`. **A river reading low says nothing about the river beside it.** A rain gauge is the

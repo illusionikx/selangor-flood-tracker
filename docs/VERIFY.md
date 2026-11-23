@@ -507,39 +507,9 @@ printf("rows: %d, points: %d, newest: %s\n",
   --ignore-certificate-errors --virtual-time-budget=40000 --window-size=1800,1000 --dump-dom \
   https://flood-exp.test/title-test.html | perl -0777 -ne 'print $1 if /<pre id="out">(.*?)<\/pre>/s'
 
-# How far apart the stations stand, in blob radii. **The water layer alone since 2026-11-19.** The rain
-# layer is an interpolated field and has no blob and no spacing, so its row and `RAIN_KM` are gone.
-# Water is the one layer left on the reach form, and `GATE` (0.20, once `FEATHER`) is its constant.
-# Re-run this before moving GATE or HEAT_KM, and before moving the join assertions in heat-test.html.
-# The text below still describes two rows. Read it as history for the rain row.
-# The two rows should stay close to each other. Measured 2026-08-14 they are near identical —
-# rainfall at 6 km reads 1.21/1.66/1.95 and water at 5 km reads 1.18/1.68/1.99 — so one FEATHER
-# fits both. That is not luck: each radius was picked for its own network's density, so the ratio
-# lands in the same place. If a future change pulls the two rows apart, FEATHER has to become a
-# per-layer option beside `groundKm` rather than stay a shared constant.
-# **It thins EVERY station, not the ones currently reporting.** The reporting set changes with the
-# weather, and two snapshots an hour apart moved the widest rain pair from 1.58 to 1.90 radii. The
-# station geometry does not move. thinHeat() guarantees 1.00 and no more, so read the spread rather
-# than the floor. Both populations, because they answer different questions and their percentiles
-# differ. A seam shows first between a station and its NEAREST neighbour, so heat-test.html takes its
-# probe distances from that row. Join solidity is scored over EVERY overlapping pair instead, since
-# any two blobs that meet can show one. At RAIN_KM 9 the rain row read 49 kept and nearest
-# 1.13/1.48/1.96 — a SHORTER radius keeps stations relatively FURTHER apart, the opposite of the
-# intuition.
-php -r '$p=json_decode(file_get_contents(".cache.json"),true);$c=file_get_contents("js/config.js");
-preg_match("/HEAT_KM\s*=\s*([\d.]+)/",$c,$m2);
-$km=fn($a,$b,$c2,$d)=>hypot($a-$c2,($b-$d)*cos(deg2rad($a)))*111;
-foreach(["water"=>[["river","gauge"],(float)$m2[1]]] as $nm=>[$kinds,$R]){
-$all=array_values(array_filter($p["stations"],fn($s)=>in_array($s["kind"],$kinds)&&$s["lat"]));
-$k=[];foreach($all as $s){foreach($k as $x) if($km($x["lat"],$x["lng"],$s["lat"],$s["lng"])<$R) continue 2; $k[]=$s;}
-$nn=[];foreach($k as $i=>$a){$n=1e9;foreach($k as $j=>$b) if($i!=$j) $n=min($n,$km($a["lat"],$a["lng"],$b["lat"],$b["lng"]));
-if($n/$R<2)$nn[]=$n/$R;}
-$ap=[];foreach($k as $i=>$a){foreach($k as $j=>$b){ if($j<=$i)continue;
-$t=$km($a["lat"],$a["lng"],$b["lat"],$b["lng"])/$R; if($t<2)$ap[]=$t;}}
-sort($nn);sort($ap);$q=fn($x,$f)=>$x[(int)(count($x)*$f)];
-printf("%-9s @%.0fkm: %d stations -> %d kept\n",$nm,$R,count($all),count($k));
-printf("  nearest neighbour : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($nn),$q($nn,.5),$q($nn,.9),end($nn));
-printf("  all overlapping   : %d pairs, median %.2f, p90 %.2f, max %.2f\n",count($ap),$q($ap,.5),$q($ap,.9),end($ap));}'
+# The spacing sweep is gone. It measured how far apart the stations stand in blob radii, to size the
+# constants of the reach form. No layer uses that form since 2026-11-19, and neither layer has a blob
+# or a spacing to measure. Rain is a mean and water is a maximum, and both are fields on a grid.
 
 # What the rain estimate is built from, and how much of the map it paints. The rain wash is an
 # interpolated field since 2026-11-19, so the old PHP replica of the reach form is gone. It answered
@@ -929,8 +899,9 @@ a canvas here needs the same treatment. A canvas is where reading the code stops
 **A seventh fault got past it, and how it did is the lesson.** `cov` took the max of the blend
 weights and drew a Voronoi border on every equidistant line. The check held two assertions over
 overlapping gauges and both passed. Both probe two gauges exactly one radius apart, which is the one
-spacing where a max behaves. A reader found it on screen instead. **`thinHeat()` guarantees one
-radius and nothing more, so one radius is the best case and never the typical one.** The assertions
+spacing where a max behaves. A reader found it on screen instead. **`thinHeat()` guaranteed one
+radius and nothing more, so one radius was the best case and never the typical one.** (`thinHeat()` and
+the reach form are deleted since 2026-11-19. The lesson stands for any probe distance.) The assertions
 added after it probe at 1.48 and 1.60 radii. The spacing sweep takes both off the station geometry.
 Pick a probe distance from measured data. Otherwise the check reports on a case the map never draws.
 

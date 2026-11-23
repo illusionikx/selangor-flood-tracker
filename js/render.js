@@ -1,13 +1,13 @@
 // Rebuilds every marker and the heat layer from the current station set.
 
-import { KINDS, MAST, HEAT_FLOOR, HEAT_KM, RAIN_STOPS, DARK_INK_FILL } from './config.js';
+import { KINDS, MAST, RAIN_STOPS, DARK_INK_FILL } from './config.js';
 import { state, PREFS, save } from './state.js';
 import { el, color, atDanger, statusColor, leads, hasInfo, isIgnored, ignoredIds,
-         favIds, isFav, scalePos, levelStops, gaugeStops, setBox, isHot, tier, doubted, faultWhy,
-         heatOk } from './util.js';
+         favIds, isFav, scalePos, setBox, isHot, tier, doubted, faultWhy,
+         heatOk, waterValue } from './util.js';
 import { marks, siteMark, shown, syncCluster, focusOn, side, openSide,
          showMast, hideMast, markSel, pinGlyph } from './map.js';
-import { heat, rainHeat, syncHeat, thinHeat } from './heat.js';
+import { heat, rainHeat, syncHeat } from './heat.js';
 import { sitePopup } from './popup.js';
 
 state.rerender = () => render();
@@ -115,25 +115,14 @@ export function render() {
 
     // Heat is its own layer with its own toggle, so a hidden river chip must not dim the heatmap.
     //
-    // The weight IS the position on the station's own threshold scale — the same piecewise 38 / 68 /
-    // 100 slots the popup meter draws, so the gradient's stops are the thresholds themselves: yellow
-    // once past alert, orange past warning, red at danger. A blob's colour is now a fact you can name
-    // ("that catchment is past its warning marks") instead of a temperature you have to interpret.
-    // Whichever sensor at a place scores higher is the one that gets to speak, so a dry-looking river
-    // next to a gauge already under water can't keep the area cold. hasInfo() gates it because an
-    // offline gauge is frozen on whatever it read the day it died — often a flood.
-    //
-    // A tripped gauge goes straight to full red regardless of depth. Its warning mark is 15 cm: a
-    // gauge that has crossed it is reporting water standing over a spot known to flood, which is an
-    // observation, not a forecast, and it outranks anything a scale could say about the centimetres.
-    const near = !heatOk(s) ? 0
-      : s.kind === 'river' ? (levelStops(s) ? scalePos(s.level, levelStops(s)) / 100 : 0)
-      : s.kind === 'gauge' && s.depth > 0
-        ? (s.status >= 1 && !doubted(s) ? 1 : scalePos(s.depth, gaugeStops(s)) / 100)
-      : 0;
-    // Below the alert slot nothing paints at all: there is nothing to act on down there, and a map
-    // warm from end to end is a map nobody reads.
-    if (near >= HEAT_FLOOR) points.push([s.lat, s.lng, near]);
+    // `waterValue()` scores a station against its own marks and returns 0 for one that draws nothing.
+    // A calm station is absent from the layer, so it draws nothing and lowers nothing: the water wash
+    // takes the HIGHEST hill of the stations near a point, and a calm river must not weaken a danger
+    // reading on a different river. A flood gauge with water over its warning mark returns the top
+    // value, which is water measured on the ground and outranks a river at its danger mark.
+    // heatOk() gates it, because an offline station is frozen on whatever it read the day it died.
+    const wv = waterValue(s);
+    if (wv > 0) points.push([s.lat, s.lng, wv]);
 
     /* Rainfall drives its own layer, on its own scale — see heat.js for why the two aren't summed.
        A wet gauge paints. A gauge reporting no rain does not paint the palest violet. That makes
@@ -263,13 +252,11 @@ export function render() {
   markSel(side.key);
 
   syncCluster();
-  // Water is thinned, not raw: overlapping blobs composite, and these are intensities rather than
-  // counts. It is thinned at the distance it paints, or the thinning and the paint disagree.
-  heat.setLatLngs(thinHeat(points, HEAT_KM));
-  // Rain is not thinned. Its wash is a normalised mean of every gauge near a node, which cannot
-  // stack, and thinning would throw away a reading the estimate is built from. Both setters ask for
-  // a redraw and leaflet.heat coalesces the pair into one frame, so the order is for a reader: the
-  // dry gauges are evidence too, and they enter as the value zero.
+  // Neither layer is thinned. A mean cannot stack and a maximum cannot add, and thinning would throw
+  // away a reading the field is built from. Water has no dry list, because a calm station is absent.
+  heat.setLatLngs(points);
+  // Both setters ask for a redraw and leaflet.heat coalesces the pair into one frame, so the order
+  // is for a reader: the dry rain gauges are evidence too, and they enter as the value zero.
   rainHeat.setDry(dryPoints);
   rainHeat.setLatLngs(rainPoints);
   /* Weather mode must tear itself down when a reader leaves it, not just paint while inside it. The

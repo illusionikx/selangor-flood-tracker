@@ -1,7 +1,8 @@
 // Small pure helpers plus the rules for "does this station actually know anything".
 
 import { KINDS, KIND_RANK, RIVER_COLOR, RAIN_COLOR, STATUS_COLOR, GAUGE_COLOR, NO_INFO,
-         LEVEL_FLOOR } from './config.js';
+         LEVEL_FLOOR, HEAT_FLOOR, HEAT_WARNING, WATER_ALERT_V, WATER_WARNING_V, WATER_DANGER_V,
+         WATER_GROUND_V } from './config.js';
 import { PREFS } from './state.js';
 
 export const el  = id => document.getElementById(id);
@@ -349,6 +350,36 @@ export const isStale = s => {
    and denies nothing. It is `hasInfo()` plus `isStale()`, and the two stay separate on purpose:
    every other surface still wants `hasInfo()` alone. */
 export const heatOk = s => hasInfo(s) && !isStale(s);
+
+/* **THE ONE FUNCTION THAT SCORES A STATION FOR THE WATER WASH.** It returns a value on the wash's
+   scale, and 0 for a station that draws nothing. `render()` sends every station above 0 to the water
+   layer and no other, so a calm station is simply absent: it draws nothing and lowers nothing.
+   Each station is scored against its own marks, the same piecewise 38 / 68 / 100 slots the popup
+   meter draws, and then mapped onto the shared scale: 0.25 at the alert mark, 0.625 at the warning
+   mark and 1 at the danger mark, in a straight line between marks. Under the alert mark it is 0.
+   A flood gauge with water over its warning mark returns `WATER_GROUND_V`. That is water measured on
+   the ground, an observation and not a forecast, and it outranks a river at its danger mark.
+   **Five cases return 0:** a station `heatOk()` rejects, a kind that is neither river nor flood
+   gauge, a river with no marks, a doubted flood gauge, and a flood gauge with no water on the ground.
+   A doubted gauge used to paint by its depth, with only its jump to the top class gated. A frozen
+   reading is no evidence about ground, so it enters nothing now. */
+export function waterValue(s) {
+  if (!heatOk(s)) return 0;
+  let w;
+  if (s.kind === 'river') {
+    const stops = levelStops(s);
+    if (!stops) return 0;
+    w = scalePos(s.level, stops) / 100;
+  } else if (s.kind === 'gauge') {
+    if (!(s.depth > 0) || doubted(s)) return 0;
+    if (s.status >= 1) return WATER_GROUND_V;
+    w = scalePos(s.depth, gaugeStops(s)) / 100;
+  } else return 0;
+  if (w < HEAT_FLOOR) return 0;
+  return w < HEAT_WARNING
+    ? WATER_ALERT_V + (w - HEAT_FLOOR) / (HEAT_WARNING - HEAT_FLOOR) * (WATER_WARNING_V - WATER_ALERT_V)
+    : WATER_WARNING_V + (Math.min(w, 1) - HEAT_WARNING) / (1 - HEAT_WARNING) * (WATER_DANGER_V - WATER_WARNING_V);
+}
 
 /* The three things we currently call "an alert", separated.
  *

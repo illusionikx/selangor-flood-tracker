@@ -10,11 +10,11 @@ Built, and in the working tree:
 - The legend tips state what the code does. The top rain class reads "very heavy".
 - Both washes draw as flat classes with a crisp edge. The rain wash is blue to purple with no red. The owner chose this on 2026-11-19. A class carries a color and no opacity, so the Settings slider is the only opacity control, and it stops at 80%.
 
-Also built: the rain wash is an interpolated estimate between gauges, on the owner's decision of 2026-11-19. Each point takes a distance-weighted mean of the rain gauges within 12 km, a dry gauge counts as zero, and ground more than 10 km from every gauge stays bare. Rain draws in 13 bands, and every edge is a smooth contour, antialiased over one pixel. The dark theme has its own rain colors. The place names draw over the wash.
+Also built: both washes are interpolated fields drawn as flat bands with smooth, antialiased contour edges. The rain wash is an estimate between gauges: each point takes a distance-weighted mean of the rain gauges within 12 km, a dry gauge counts as zero, and ground more than 10 km from every gauge stays bare. The water wash takes the highest hill of the stations near a point, so a calm station draws nothing and lowers nothing, and water measured on the ground by a flood gauge has a class above a river at its danger mark. Rain draws in 13 bands and water in 10. The dark theme has its own rain colors and its own top water color. The place names draw over the wash.
 
-The owner chose interpolation with knowledge of the research in this paper. The research found no study that compares a blurred field with a crisp one for point gauges, and it found that a storm cell is often smaller than the gap between gauges. The map states that it estimates. The water layer makes no estimate.
+The owner chose both with knowledge of the research in this paper. The research found no study that compares a blurred field with a crisp one for point gauges, and it found that a storm cell is often smaller than the gap between gauges. A separate study of water stations found no service that draws an area between them, and the water wash states that it is station state and not the edge of a flood.
 
-Waiting for an owner decision: nothing is open. The work is in the working tree and not committed.
+Waiting for an owner decision: nothing is open. The work is committed.
 
 Not built:
 
