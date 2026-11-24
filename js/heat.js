@@ -338,7 +338,7 @@ const SoftHeat = L.HeatLayer.extend({
       const py = gy * CELL + O, cby = Math.floor(py / reach) + 1;
       for (let gx = 0; gx < cw; gx++) {
         const px = gx * CELL + O, cbx = Math.floor(px / reach) + 1;
-        let sw = 0, swv = 0, dmin2 = Infinity, vn = 0, best = 0, bestV = 0, bestD = Infinity, hsum = 0, topV = 0;
+        let sw = 0, swv = 0, dmin2 = Infinity, vn = 0, best = 0, bestV = 0, bestD = Infinity, hsum = 0, topV = 0, nearD = Infinity, nearV = 0;
         for (let by = cby - 1; by <= cby + 1; by++) {
           if (by < 0 || by >= nby) continue;
           for (let bx = cbx - 1; bx <= cbx + 1; bx++) {
@@ -350,12 +350,13 @@ const SoftHeat = L.HeatLayer.extend({
               if (maxMode) {
                 if (dd >= r2) continue;
                 const d = Math.sqrt(dd), t = d / R;
-                // Two square roots stand in for `pow` at the shipped 1.5, which is several times slower.
+                // A short form stands in for `pow` at 1.5, 2.5, 3 and 4, which is several times slower.
                 const s = dd / D02;
-                const q = HP === 2 ? s : HP === 1.5 ? Math.sqrt(s) * Math.sqrt(Math.sqrt(s)) : Math.pow(s, HP / 2);
+                const q = HP === 2 ? s : HP === 1.5 ? Math.sqrt(s) * Math.sqrt(Math.sqrt(s)) : HP === 2.5 ? s * Math.sqrt(Math.sqrt(s)) : HP === 3 ? s * Math.sqrt(s) : HP === 4 ? s * s : Math.pow(s, HP / 2);
                 const hv = b[i][2] * (t > 0.5 ? ramp(t, 0.5) : 1) / (1 + q);
                 hsum += hv;
                 if (b[i][2] > topV) topV = b[i][2];
+                if (d < nearD) { nearD = d; nearV = b[i][2]; }
                 if (hv > best) { best = hv; bestV = b[i][2]; bestD = d; }
                 continue;
               }
@@ -370,7 +371,15 @@ const SoftHeat = L.HeatLayer.extend({
         const i = gy * cw + gx;
         // The blend fills the gaps between stations, but it never goes above the highest station in
         // reach. So it can never paint a class that no station reported.
-        if (maxMode) { V[i] = Math.min(topV, best + blend * (hsum - best)); Vn[i] = bestV; Dm[i] = bestD; continue; }
+        /* **Within a station's own plateau, that station decides, even if a neighbour's hill is higher
+           there.** The put-back otherwise takes the station whose hill wins. Since the 2026-11-24
+           tuning a wide flat hill can win at another station's own spot: a flooded gauge (1.25) reached
+           1.06 at a river at danger 3 km away, and painted the river's spot as water on the ground. */
+        if (maxMode) {
+          V[i] = Math.min(topV, best + blend * (hsum - best));
+          if (nearD <= 1.5 * CELL) { Vn[i] = nearV; Dm[i] = nearD; } else { Vn[i] = bestV; Dm[i] = bestD; }
+          continue;
+        }
         const d = Math.sqrt(dmin2);
         V[i] = swv / (sw + w0); Vn[i] = vn; Dm[i] = d;
         C[i] = covpx - Math.min(d, far);
@@ -437,10 +446,11 @@ export const heat = new SoftHeat([], {
   groundKm: WATER_INTERP_KM,
   interp: true,
   interpKm: WATER_INTERP_KM, priorKm: WATER_PRIOR_KM, coverKm: 0, floor: RAIN_FLOOR, combine: 'max',
-  /* Tuned by the owner on 2026-11-23. A falloff power of 1.5 gives a hill a long tail, so a station
-     at danger colours its whole reach. A blend of 0.1 joins nearby hills so the wash is less spotty.
-     The blend is capped at the highest station in reach, so it never paints an unreported class. */
-  hillPow: 1.5, blend: 0.1, minDefault: 0.35,
+  /* Tuned by the owner on 2026-11-24, on the flood cluster near Kuala Selangor. Three stations at
+     danger 8 to 12 km apart drew as three bullseyes at power 1.5 and blend 0.1. Power 2.5 widens the
+     red core, and blend 0.4 fills the ground between nearby hills. The blend is capped at the highest
+     station in reach, so it never paints a class that no station reported. */
+  hillPow: 2.5, blend: 0.4, minDefault: 0.25,
   /* Classes are the thresholds, not arbitrary fractions: `waterValue()` in js/util.js scores each
      station by where it sits on its own alert / warning / danger scale, so yellow means "past
      alert", orange "past warning" and red "at danger" — the same reading the pin and the meter give,
@@ -468,7 +478,7 @@ export const rainHeat = new SoftHeat([], {
   interpKm: INTERP_KM, priorKm: PRIOR_KM, coverKm: COVER_KM, floor: RAIN_FLOOR, combine: 'mean',
   /* Tuned by the owner on 2026-11-23. A nugget of 0.5 lets the field smooth over a single gauge, so
      one odd reading draws a softer bullseye. */
-  nugget: 0.5, minDefault: 0.3,
+  nugget: 0.5, minDefault: 0.25,
   classes: RAIN_CLASSES,
   dark: RAIN_CLASSES_DARK,
 });
@@ -531,8 +541,8 @@ export function heatStyle() { for (const l of LAYERS) l.redraw(); }
 /* The opacities of one layer. A layer option overrides the Settings value. The top is the slider
    that existed before stepped mode, and it keeps its 80% cap. The lowest band never goes above it. */
 /* The stepped defaults, tuned by the owner on 2026-11-23. The highest band is 70% on both layers.
-   The lowest band is 30% on rain and 35% on water, because water's lowest band is the alert yellow
-   and it reads weakly on a light map. A reader's Settings value replaces both defaults. */
+   The lowest band is 25% on both since 2026-11-24, on the owner's tuning. It was 30% on rain and 35%
+   on water. A reader's Settings value replaces both defaults. */
 export const HEAT_OPACITY_TOP = 0.7;
 export const minDefault = l => l.options.minDefault;
 // Stepped is the default since 2026-11-23, so only a stored 'flat' turns it off.

@@ -321,6 +321,9 @@ export const RAIN_FLOOR = 0.125;   // the wash floor, shared by both layers
    A station's hill is its value, halved at `WATER_PRIOR_KM` (5, which is the reach a station at its
    alert mark had before) and ended at `WATER_INTERP_KM` (10). There is no cover margin: a hill ends
    where it falls under `RAIN_FLOOR`, so a station exactly at its alert mark colours 5 km.
+   **The owner tuned it to 6 on 2026-11-24**, with the falloff power and blend in js/heat.js, so
+   that three stations at danger on one river read as one area. A station at its alert mark now
+   colours 6 km.
    **The value scale.** Each station is scored against its OWN marks, then mapped onto one scale so
    that a river and a flood gauge share it: nothing under the alert mark, 0.25 at the alert mark,
    0.625 at the warning mark and 1 at the danger mark. A flood gauge with water over its warning mark
@@ -329,7 +332,7 @@ export const RAIN_FLOOR = 0.125;   // the wash floor, shared by both layers
    warning for "a disaster has occurred" for the same reason. `waterValue()` in util.js is the one
    function that scores a station. */
 export const WATER_INTERP_KM = 10;
-export const WATER_PRIOR_KM  = 5;
+export const WATER_PRIOR_KM  = 6;
 export const WATER_ALERT_V   = 0.25;
 export const WATER_WARNING_V = 0.625;
 export const WATER_DANGER_V  = 1;

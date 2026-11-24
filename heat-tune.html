@@ -67,7 +67,7 @@
     <div class="title"><b>Heatmap tuning</b><button class="icon" id="min" title="Fold the panel">▾</button></div>
     <div class="seg big" id="layerSeg"><button data-v="rain" class="on">Rainfall</button><button data-v="water">Water level</button></div>
     <div class="opts">
-      <select id="src"><option value="live">Live data</option><option value="test">Test storm</option></select>
+      <select id="src"><option value="live">Live data</option><option value="test">Test storm</option><option value="cluster">Flood cluster</option></select>
       <label><input type="checkbox" id="dark"> Dark</label>
       <label><input type="checkbox" id="bgOn" checked> Background</label>
       <label><input type="checkbox" id="dots" checked> Stations</label>
@@ -76,7 +76,7 @@
   <div class="body" id="rows"></div>
   <div class="foot">
     <button class="pri" id="copy">Copy parameters</button>
-    <button id="reset">Reset layer</button>
+    <button id="reset" title="Back to the values this page opened with">Reset layer</button>
     <span class="stat" id="stat">loading</span>
   </div>
 </div>
@@ -144,6 +144,10 @@ const DEF = {};
 for (const [name, l] of Object.entries(LAYER))
   for (const [, rows] of [...SECTIONS[name], ...SHARED]) for (const [k] of rows) DEF[name + '.' + k] = l.options[k];
 
+// What the page opened with, which is the shipped values. "Reset layer" and the row arrows go back here, and not to the shipped values.
+const START = {};
+for (const [name, l] of Object.entries(LAYER))
+  for (const [, rows] of [...SECTIONS[name], ...SHARED]) for (const [k] of rows) START[name + '.' + k] = l.options[k];
 let active = 'rain';
 const opts = () => LAYER[active].options;
 const fmt = v => typeof v === 'number' ? +v.toFixed(4) : v;
@@ -175,8 +179,8 @@ function build() {
       row.className = 'row' + (min === null ? ' sw' : '');
       row.dataset.k = k;
       row.innerHTML = min === null
-        ? `<input type="checkbox"><span class="lbl">${label}<br><span class="hint">${hint}</span></span><button class="rs" title="Back to shipped">↺</button>`
-        : `<div class="top"><span class="lbl">${label}</span><button class="rs" title="Back to shipped">↺</button>
+        ? `<input type="checkbox"><span class="lbl">${label}<br><span class="hint">${hint}</span></span><button class="rs" title="Back to the start value">↺</button>`
+        : `<div class="top"><span class="lbl">${label}</span><button class="rs" title="Back to the start value">↺</button>
              <input type="number" min="${min}" max="${max}" step="${step}"></div>
            <input type="range" min="${min}" max="${max}" step="${step}">
            <div class="hint">${hint} Shipped: ${DEF[active + '.' + k]}</div>`;
@@ -184,7 +188,7 @@ function build() {
       const take = v => { setOpt(k, v); show(row); paint(); };
       if (min === null) inputs[0].onchange = () => take(inputs[0].checked);
       else for (const i of inputs) i.oninput = () => { if (i.value !== '') take(+i.value); };
-      row.querySelector('.rs').onclick = e => { e.preventDefault(); take(DEF[active + '.' + k]); };
+      row.querySelector('.rs').onclick = e => { e.preventDefault(); take(START[active + '.' + k]); };
       show(row);
       sec.append(row);
     }
@@ -214,8 +218,8 @@ $('layerSeg').onclick = e => { const v = e.target.dataset.v; if (v && v !== acti
 $('min').onclick = () => { const m = $('tune').classList.toggle('min'); $('min').textContent = m ? '▸' : '▾'; };
 
 $('reset').onclick = () => {
-  for (const [, rows] of [...SECTIONS[active], ...SHARED]) for (const [k] of rows) setOpt(k, DEF[active + '.' + k]);
-  build(); paint(); toast('Layer reset to shipped values');
+  for (const [, rows] of [...SECTIONS[active], ...SHARED]) for (const [k] of rows) setOpt(k, START[active + '.' + k]);
+  build(); paint(); toast('Layer reset to the start values');
 };
 $('copy').onclick = async () => {
   const out = {};
@@ -238,6 +242,14 @@ map.createPane('fakebg').style.zIndex = 200;
 map.createPane('fakedots').style.zIndex = 300;
 const bg = L.layerGroup().addTo(map), dotLayer = L.layerGroup().addTo(map);
 let land = null, stations = [];
+/* **The flood cluster**, from the owner's screenshot of 2026-11-24 near Kuala Selangor. Three river
+   stations at danger, 8 to 12 km apart, and two calm ones between them. A calm station is absent
+   from the layer, so it draws no hill, and it shows here as a grey dot. This is the case the test
+   storm does not hold: a river in flood that reads as three spots. Value 1 is danger. */
+const CLUSTER = [
+  [3.340, 101.250, 1], [3.395, 101.345, 1], [3.300, 101.405, 1],   // danger
+  [3.350, 101.300, 0], [3.330, 101.370, 0],                        // calm, between them
+];
 function drawBg() {
   bg.clearLayers();
   const on = $('bgOn').checked, dk = $('dark').checked;
@@ -254,6 +266,12 @@ function drawDots() {
   dotLayer.clearLayers();
   if (!$('dots').checked) return;
   const dk = $('dark').checked;
+  if ($('src').value === 'cluster') {
+    if (active === 'water') for (const [la, lo, v] of CLUSTER)
+      L.circleMarker([la, lo], { pane: 'fakedots', interactive: false, radius: 4, weight: 0.75,
+        color: dk ? '#000' : '#fff', fillColor: v > 0 ? '#dc2626' : (dk ? '#6b7680' : '#9aa5ad'), fillOpacity: 1 }).addTo(dotLayer);
+    return;
+  }
   for (const s of stations) {
     let fill;
     if (active === 'rain' && s.kind === 'rainfall' && heatOk(s) && !doubted(s)) fill = s.hourly > 0 ? '#2563eb' : (dk ? '#6b7680' : '#9aa5ad');
@@ -268,6 +286,15 @@ $('bgOn').onchange = drawBg;
 $('dots').onchange = drawDots;
 
 async function load() {
+  if ($('src').value === 'cluster') {
+    // No payload: five fixed stations. Rain has none, so the rain tab is empty on this source.
+    stations = [];
+    heat.setLatLngs(CLUSTER.filter(c => c[2] > 0)); rainHeat.setDry([]); rainHeat.setLatLngs([]);
+    map.setView([3.34, 101.33], 11, { animate: false });
+    pick('water');
+    toast('Flood cluster: 3 stations at danger, 2 calm between them');
+    return;
+  }
   stat('loading stations');
   const j = await (await fetch(FEED)).json();
   stations = j.stations || [];

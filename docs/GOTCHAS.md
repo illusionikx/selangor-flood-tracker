@@ -2201,6 +2201,12 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   nearby hills at warning added a whole danger step that no station reported. With it, two warnings
   can join into one warning area and never into danger. Do not remove the cap. **Any falloff power
   but 2 and 1.5 calls `Math.pow` per pair**, and that took the test storm past 80 ms.
+  **Changed again 2026-11-24, on the owner's tuning of a flood cluster.** Half distance 6, falloff
+  power 2.5, blend 0.4. Three stations at danger 8 to 12 km apart drew as three bullseyes, and now
+  draw as one area. Short forms cover powers 1.5, 2, 2.5, 3 and 4. **Within 1.5 cells of a station,
+  the NEAREST station decides the put-back, not the winning hill.** At these values a flooded gauge
+  (1.25) reached 1.06 at a river at danger 3 km away. The winning-hill rule then painted the river's
+  own spot as water on the ground, and `heat-test.html` caught it.
 - **THE RAIN WASH IS AN ESTIMATE, AND FIVE THINGS HOLD IT TOGETHER.** `SoftHeat._interp()` in
   `js/heat.js` takes a distance-weighted mean of the CLASS POSITION of every gauge within 12 km, wet
   and dry. **The prior is a constant weight on the value 0, and without it a lone wet gauge paints a

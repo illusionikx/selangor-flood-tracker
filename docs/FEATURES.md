@@ -21334,3 +21334,22 @@ The plan is `docs/superpowers/plans/2026-11-19-water-interpolation.md`. The rese
 **Trade-offs accepted.** Light rain spreads further than the 6 km correlation figure. A danger station colours its whole 10 km reach. The Settings lowest-band slider is one value for both layers, so it shows the default of the layer the heat chip names until a reader moves it.
 
 **Not built.** Outlier damping on water: the layer receives only stations past alert, so a lone alerting station has no calm neighbour to compare against.
+
+## The water wash joins nearby stations (2026-11-24)
+
+The plan is `docs/superpowers/plans/2026-11-24-water-wash-less-spotty.md`, Part A.
+
+**Why.** Three river stations at danger near Kuala Selangor, 8 to 12 km apart, drew as three separate bullseyes. A reader saw three spots where one river was in flood. The wash draws a hill round each point and holds no river data. At falloff power 1.5 the red bands reached only 1.2 km, and a blend of 0.1 joined the hills only a little.
+
+**What changed.** The owner tuned the water layer on a new "Flood cluster" source in `heat-tune.html`, which holds the screenshot's case: three stations at danger and two calm ones between them. The values are half distance 6 km (`WATER_PRIOR_KM`, was 5), falloff power 2.5 (was 1.5) and blend 0.4 (was 0.1). The lowest band opacity is 25% on both layers (was 30% on rain and 35% on water), so the one Settings slider shows the true default for both.
+
+**A new guard.** Within 1.5 cells of a station, the nearest station decides the put-back. At the new values a flooded gauge's hill reached above a danger river's own reading 3 km away, and painted the river's spot as water on the ground. A station keeps its own class at its own spot.
+
+**Rain follows only in opacity.** Blend and falloff power exist only on the water layer. Rain already blends, because it averages every gauge in reach, and its pull to dry is 8 km.
+
+**Trade-offs accepted.** A station at its alert mark now colours 6 km, not 5, so a calm day draws slightly more. The blend fills ground between stations with a class up to the highest station in reach. That ground can lie on another river.
+
+**Timing, median of 9 on a 1300 x 800 canvas, test storm.** Water: 21, 40, 49, 23, 8, 4 and 4 ms at zoom 9 to 15. Rain: 32, 57, 51, 51, 27, 31 and 14 ms. All under 60 ms.
+
+**Not built.** Part B of the plan, colouring the river line between stations, waits for the owner.
+
