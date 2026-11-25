@@ -4,9 +4,34 @@
 :root {
   color-scheme: light;
   --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0;
-  --hover: #f1f3f4; --accent: #1a73e8;
+  --hover: #f1f3f4; --accent: var(--brand-volt);
   --shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
   --slide: .25s cubic-bezier(.4, 0, .2, 1);
+
+  /* --- the brand constants, from branding/tokens/brand.css --------------------------------------
+     The same on both themes. Only `--accent` moves with the theme, and it moves below. The accent
+     was #1a73e8 before the rebrand of 2026-11-25. Volt is 6.98:1 on white and 6.27:1 on `--hover`.
+     These constants never paint a status or a sensor kind. Those live further down in this file.
+     The two font stacks name the faces that vendor/fonts.css declares. */
+  --brand-volt: #0038FF;
+  --brand-volt-light: #8AA4FF;
+  --brand-water: #5B86FF;
+  --brand-shallow: #E6ECFF;
+  --brand-ink: #0B0D10;
+  --brand-paper: #FFFFFF;
+  --brand-night: #0A1233;
+  /* **Fill and ink are two tokens, since 2026-11-25 (MIGRATION.md Phase 1c).** `--accent` is INK:
+     text, links, glyphs and the focus ring. `--accent-fill` is a FILLED SHAPE with a label on it: the
+     rail FAB, the switch track, a progress fill, a selected speed chip. On the light theme both are
+     volt. On the dark theme the ink must be the pale `#8AA4FF`, because volt text on `#202124` is
+     about 2.3:1. A filled shape does not need that. Pale fills read pastel and lose the brand, so the
+     dark fill is volt bright `#2F5BFF` with a white label (5.17:1). The shape is 3.1:1 against the
+     dark surface. A tint such as `color-mix(--accent 14%)` stays on the ink, because it is a wash. */
+  --brand-volt-bright: #2F5BFF;
+  --accent-fill: var(--brand-volt);
+  --on-accent-fill: var(--brand-paper);
+  --font-display: 'Archivo', 'Roboto', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* --- the bridge onto M3's own token set --------------------------------------------------------
      **The scales are vendored, not copied.** `vendor/m3/tokens.css` carries M3's shape, typescale,
@@ -36,17 +61,20 @@
   --md-sys-color-outline: var(--outline);
   --md-sys-color-outline-variant: var(--outline);
   --md-sys-color-primary: var(--accent);
-  /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in
+  /* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8AA4FF) in
      the dark theme, where white on it is a contrast failure. The token is already near-black there
      and already white in the light theme, so one declaration is correct in both. */
   --md-sys-color-on-primary: var(--surface);
   /* M3 paints a selected navigation indicator in `secondary-container`, which is a low-chroma tint
      of its own tonal palette. This app holds one surface tone, and it already declines
-     `surface-container-high` for the same reason. So the indicator takes the selected language this
-     app already has: a selected surface fills with `--accent` and inks with `--surface`.
-     `--accent` is not a status hue, so the colour language is unbroken. */
-  --md-sys-color-secondary-container: var(--accent);
-  --md-sys-color-on-secondary-container: var(--surface);
+     `surface-container-high` for the same reason. So the indicator takes the INK: the inverse
+     surface, which is the next role down. It is #1F1F1F with a white glyph on the light theme
+     (16.5:1) and #E8EAED with a #202124 glyph on the dark theme (13.4:1). No new colour.
+     **It was the accent until 2026-11-25.** The owner chose ink for the rebrand, so the volt accent
+     stays for actions and the mark and a selected item does not shout. `--accent` is not a status
+     hue and neither is ink, so the colour language is unbroken. */
+  --md-sys-color-secondary-container: var(--md-sys-color-inverse-surface);
+  --md-sys-color-on-secondary-container: var(--md-sys-color-inverse-on-surface);
   /* M3's outlined button fills its SELECTED state with `inverse-surface`. That is the one M3 role
      this app can bridge without inventing a colour or reaching for a tonal tint: the page's own ink
      as a fill, and the page's own fill as the ink. Both tokens already exist, both already flip with
@@ -387,7 +415,8 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --surface: #202124; --on-surface: #e8eaed; --muted: #9aa0a6; --outline: #3c4043;
-  --hover: #303134; --accent: #8ab4f8;
+  --hover: #303134; --accent: var(--brand-volt-light);   /* 6.77:1 on #202124, 5.47:1 on #303134 */
+  --accent-fill: var(--brand-volt-bright);                /* white label 5.17:1. See the light block */
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 6px 2px rgba(0,0,0,.3);
   /* The three `--mask-*` tokens stood here too, and they are deleted. See the light theme's note. */
 }

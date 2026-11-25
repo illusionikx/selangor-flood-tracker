@@ -110,7 +110,7 @@ self.addEventListener('push', e => {
   try { p = e.data.json(); } catch { p = { title: 'Klang Valley Flood Watch', body: 'Open the app for details.' }; }
   e.waitUntil(self.registration.showNotification(p.title, {
     body: p.body, tag: p.tag, renotify: true,
-    icon: at('icon-192.png'), badge: at('icon-192.png'),
+    icon: at('icon-192.png'), badge: at('badge-96.png'),
     ...(p.image ? { image: at(p.image) } : {}),
     data: { url: at(p.url || '#alerts') },
   }));

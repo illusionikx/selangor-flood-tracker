@@ -21353,3 +21353,31 @@ The plan is `docs/superpowers/plans/2026-11-24-water-wash-less-spotty.md`, Part 
 
 **Not built.** Part B of the plan, colouring the river line between stations, waits for the owner.
 
+## Rebrand: the Breach mark and the volt accent (release R1, 2026-11-25)
+
+The app now wears the Flood Watch identity from `branding/`. The rule is calm UI and loud brand. The surfaces, the status colors, the sensor kind colors and the map do not change. Volt blue replaces the old accent. The mark, the wordmark, the splash and the share card carry the brand. `branding/MIGRATION.md` holds the plan and `branding/DEPLOY-PLAN.md` holds the release order. This entry covers release R1. Releases R2 and R3 follow.
+
+**What changed.**
+- The accent is `#0038FF` on the light theme and `#8AA4FF` on the dark theme. It was `#1a73e8` and `#8ab4f8`. Everything that read `--accent` follows. Volt is 6.98:1 on white. The dark accent is 6.77:1 on the dark surface. The brand constants and the two font stacks sit at the top of `css/base.css` as `--brand-*`, `--font-display` and `--font-mono`.
+- Fill and ink are two tokens (MIGRATION.md Phase 1c). `--accent` is ink: text, links, glyphs and the focus ring. `--accent-fill` is a filled shape, with `--on-accent-fill` on it. On the light theme both are volt. On the dark theme the ink stays the pale `#8AA4FF`, because volt text on `#202124` is about 2.3:1. The fill is volt bright `#2F5BFF` with a white label (5.17:1). The owner saw R1 on the branch and found the pale fills pastel. The search FAB, the switch track, the Help number discs, the opacity slider, the camera wall progress bar, the timeline seek fill and thumb, and the selected speed now take the fill. Tints such as `color-mix(--accent 14%)` stay on the ink, because they are washes.
+- On the dark theme the rail and app bar mark draws as the tile: an `--accent-fill` rounded square with the white glyph, in the same 24px box. The light theme keeps the volt glyph.
+- The selected navigation item is ink. `secondary-container` now bridges to the inverse surface, so the indicator is `#1F1F1F` with a white glyph on the light theme and `#E8EAED` with a dark glyph on the dark theme. No new color exists. The volt accent stays for actions and the mark.
+- Two faces are vendored: Archivo Expanded for the wordmark and JetBrains Mono for the descriptor. Both are SIL OFL 1.1 and both are same-origin, so the Content-Security-Policy needs no new line. The service worker precaches both, because the splash draws them.
+- `icon.svg` is the Breach glyph. It is a bare glyph on transparency. `icon-build.php` bakes the volt tile icons, the maskable pair, the iOS square, the notification badge, `favicon.svg` and `favicon.ico` from it. It also prints the `--i-flood` mask rule.
+- The wordmark is `FLOOD WATCH`. The open rail draws the mark and the word at 13px. The phone bar draws the mark alone, and the word stays in the page for a screen reader. `KLANG VALLEY` is a descriptor on the splash and in the About box only.
+- The splash is a volt field with a white mark and a white wordmark. The offline and server warnings sit in a white card that pins the light theme, so a status color never lands on volt.
+- The red alert favicon is now a rounded `--s-danger` tile with the white glyph. It was a red glyph. It still reads as our icon in a tab strip full of tiles.
+- The share card is `og-image.png`, with `og:` and `twitter:card` tags. The Pages bake writes an absolute `og:image` URL through the new `--origin=` flag. The server build keeps it relative, because nothing in this repository names that host.
+- The installed Android app launches on volt (`background_color`).
+
+**Why.** The owner chose the Breach mark and the volt accent after a brand audit and several rounds in the design canvas. A selected item in blue made the rail loud. Ink keeps the rail calm.
+
+**Trade-offs accepted.**
+- The phone bar lost its word. The brand there is 24px of mark in a shared pill, and no spelling of `FLOOD WATCH` fits beside it. The old bar drew `KVFW`.
+- The rail word is 13px. At 15px the lockup needed about 176px against a 164px box.
+- The new fonts add about 75 KB on a first visit.
+- The red favicon needed `icon.svg` in the build. The build did not copy it before, so the red favicon failed silently on `site/`. It is in the copy list now.
+- An existing iOS install keeps its old icon until someone adds the app to the home screen again.
+
+**Not built in R1.** Bold buttons (R2), readings in JetBrains Mono (R2) and the vivid sensor kind colors (R3). No brand color is on the map. Roboto stays the UI face.
+

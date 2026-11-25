@@ -27,7 +27,7 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `watch.php` | reads a payload on stdin and complains when it is wrong. The poll cron pipes into it. Reports a change of state, never a state |
 | `.user.ini` | per-directory PHP settings. Holds one line, `session.auto_start=0`, and the reason it is there |
 | `index.html` | markup only. No inline CSS or JS. It holds the `<base href>` and the Content-Security-Policy `<meta>` tag, and both come before every URL |
-| `title-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the wordmark ladder in both of the heading's homes, the app bar and the navigation rail, in rendered pixels |
+| `title-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the wordmark in both of the heading's homes, the app bar and the navigation rail, in rendered pixels. A shut rail draws nothing, an open rail draws the mark and the word, and the phone bar draws the mark alone. It also asks whether Archivo loaded |
 | `narrow-test.html` | `chrome --headless --dump-dom` — one of ten runnable checks. Guards the narrow-window block: its threshold, its coverage, its refusal to be dismissed, and that it is modal |
 | `keys-test.html` | `chrome --headless --dump-dom`. One of ten runnable checks. Guards the keyboard. It presses each one-key shortcut and reads what moved. It checks that the Help sheet prints every key. It checks the three gates: typing, a modal dialog and Ctrl. It checks that a table row takes Tab and arrow travel. It checks that the camera wall steps by tile and by row. It checks that the map cursor moves the selection teardrop and gives it the focus ring. It checks that every focus ring resolves to one width and colour. Takes `?base=/site/` |
 | `js/keys.js` | the keyboard. Holds `KEYS`, the eight one-key shortcuts. Holds the map cursor, which is Shift and an arrow over the canvas pins. Holds arrow travel through the alert rows, the table rows, the camera wall and the kinds menu. `app.js` imports it last, and nothing imports it |
@@ -74,8 +74,9 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `js/wx.js` | the MET weather layer: the map mode, the pins, and the half-hour panel. `hereCard()` draws that panel over the reader's own fix, and `carry()` hands a card across a layer switch. Deferred |
 | `manifest.json` | PWA manifest. `.json`, not `.webmanifest` — see the gotcha below |
 | `sw.js` | service worker: cache-first for hashed files, network-first for the rest, and the reason Chrome offers "Install app". A page load of any view path stores under the one root key, and only when the answer is HTML |
-| `icon.svg` | the app mark: bare glyph, no fill. Source for the PNGs *and* the `--i-flood` mask |
-| `icon-build.php` | `php icon-build.php` — rebakes the two icons and prints the mask rule to paste |
+| `icon.svg` | the app mark, the Breach: bare glyph, no fill, no tile. **It must stay bare.** `js/alerts.js` paints the red favicon from it. Source for every icon below *and* the `--i-flood` mask |
+| `icon-build.php` | `php icon-build.php` — rebakes every icon below from `icon.svg` and prints the mask rule to paste |
+| `branding/` | the brand kit, the source of truth for the identity. Logos, icons, fonts, tokens and the share card. App files are copies baked from it. `MIGRATION.md` and `DEPLOY-PLAN.md` hold the rebrand plan. `branding/o4/` is an older export |
 | `water-build.php` | `php water-build.php` — rebakes `water.json` and `rivers.json` from OpenStreetMap. The app reads neither file since 2026-09-15. It runs two Overpass queries. The second asks for `natural=coastline`, to build the sea. `MIN_AREA_KM2` and `MIN_RIVER_KM` are band edges now. They no longer cut a shape. Band 0 rivers run 1.0008 to 94.1182 km. Band 1 runs 0.3003 to 0.9984 km. Band 2 runs 0.0111 to 0.2982 km. Bodies follow the same pattern against 0.01 and 0.002 square kilometres. Also holds the Douglas-Peucker tolerance `TOL_DEG`. Takes `--tol=` and `--dp=` to try a value, and `--cached` to reuse the last raw Overpass answer. Run by hand, never in a request |
 | `water.json` | **Not drawn and not shipped since 2026-09-14.** Only `basemap-spike.html` reads it. Seven features it bakes and commits: the sea, and three bands each of rivers and water bodies. Band 0 draws at every zoom. Band 1 draws from zoom 11. Band 2 draws from zoom 13. 2,511 KB on disk, about 568 KB gzipped, with the sea |
 | `rivers.json` | **Not drawn and not shipped since 2026-09-15.** The three river bands out of `water.json`, baked beside it. The dark theme drew them as lines for one day. 979 KB on disk, about 241 KB gzipped |
@@ -83,12 +84,16 @@ No auth, no build step, no framework. Served by Laravel Herd at `https://flood-e
 | `border.json` | the `land` feature is the one shape `js/map.js` reads. Its EXTENT, grown by `MARGIN`, is the one source for four things: the pan limit, the zoom floor, which tiles the map asks for and `inCover()`. **Never `bounds`** — that is the whole relation, and it reaches 44 km further west, into the Strait of Malacca. `bounds` and the full outline are read by `border-build.php` and `map-limits-test.html` alone. The `circle` key is dead since 2026-09-23 and leaves on the next rebake. 30 KB, 4 KB gzipped |
 | `wx-build.php` | `php wx-build.php` — bakes `wx-places.json` from Nominatim. Run by hand, never in a request |
 | `wx-places.json` | the district behind each weather point, baked and committed |
-| `icon-192.png`, `icon-512.png` | manifest icons (`any`) and the favicon — the glyph on transparency |
-| `icon-180.png` | `apple-touch-icon`. Opaque, because iOS flattens alpha onto a colour of its own |
+| `icon-192.png`, `icon-512.png` | manifest icons (`any`). A volt tile with rounded corners and a white glyph |
+| `icon-maskable-192.png`, `icon-maskable-512.png` | manifest icons (`maskable`). A full-bleed volt square, the glyph inside the 80% safe zone |
+| `favicon.svg`, `favicon.ico` | the tab icon. The same rounded tile, as vector and as 16, 32 and 48 pixel PNGs. `js/alerts.js` swaps the first `link[rel=icon]` for a red tile at the top rung |
+| `badge-96.png` | the Android notification badge. A white glyph on transparency, because Android reads only the alpha. `sw.js` names it |
+| `og-image.png` | the share card, 1200 by 630, copied from `branding/social/`. `index.html` names it in `og:image` |
+| `icon-180.png` | `apple-touch-icon`. A full-bleed volt square, no rounded corners, because iOS rounds them itself |
 | `img/` | optional. `egg.webp` (the About easter egg) and `img/help/`, the eight Help screenshots and `marks.json`. Absent is a supported state — see below. Help then shows its text alone |
 | `m3-build.php` | `php m3-build.php` — bakes `vendor/m3/tokens.css` from the M3 Expressive token set. Run by hand, never in a request |
 | `vendor/m3/tokens.css` | M3's shape, typescale, elevation, motion and state scales, vendored. Generated — **colour is deliberately not in it** |
-| `vendor/` | Leaflet, leaflet.heat (patched), subsetted fonts, the M3 token scales — no CDN, hand-managed. **markercluster left on 2026-09-03**, when the pins moved to a canvas |
+| `vendor/` | Leaflet, leaflet.heat (patched), subsetted fonts (Roboto for the UI, Archivo Expanded for the wordmark, JetBrains Mono for the descriptor and, in release R2, the readings), the M3 token scales — no CDN, hand-managed. **markercluster left on 2026-09-03**, when the pins moved to a canvas |
 | `basemap-spike.html` | **throwaway, not a check and not part of the app.** Twelve tile services at one view, with `water.json` over each. It answers which basemap draws the sea, because Esri's Canvas pair paints it near-black and a reader asked why the sea is not blue. It contacts OpenStreetMap, OpenTopoMap and CARTO, which the app itself never does. See docs/FEATURES.md |
 | `maplibre-spike.html` | **throwaway, not a check and not part of the app.** Measures a MapLibre GL vector basemap against the Esri raster one under 460 canvas marks. It loads unpkg and OpenFreeMap, which the app itself never contacts. See docs/FEATURES.md for what it answered |
 | `lib/` | Composer's vendor dir (`symfony/dom-crawler`), gitignored — **not** `vendor/` |
@@ -419,6 +424,13 @@ coordinate. See "KL cameras" in `docs/FEATURES.md`.
   for a location this app failed to get. That is a fault in a control, rather than a station in
   trouble. On a flood map an amber glyph in the app bar reads as an alert on the water.
   **A broken control changes its glyph, never its hue.** See `--i-location_disabled`.
+- **The brand accent is two tokens: ink and fill, since 2026-11-25.** `--accent` is ink: text,
+  links, glyphs and the focus ring. `--accent-fill` is a filled shape, and its label takes
+  `--on-accent-fill`. Both are volt (`#0038FF`) on the light theme. On the dark theme the ink is
+  `#8AA4FF`, because volt text on the dark surface is about 2.3:1. The fill is `#2F5BFF` with a
+  white label, so a filled control keeps the brand's weight. A tint of the accent stays on the ink.
+  Neither token is a status hue, and neither paints a station kind. The selected navigation item is
+  the inverse surface (ink), not the accent. See MIGRATION.md Phase 1c and the fill gotcha.
 - **The values live in `css/base.css` and nowhere else**, two sets, one per theme — except on a map
   pin and on the station panel. `.pin` shares the dark theme's set on both themes, through the
   selector `:root[data-theme="dark"], .pin` on the map-palette block, and `.pin, #side` states the
@@ -664,7 +676,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - The camera wall is painted on a poll, never rebuilt.
 - A grid row does not follow its item's `aspect-ratio`, so `#camGrid` sets `g...
 - Under `NARROW_PX` (300) the app blocks the whole page, and that block is a ...
-- The heading has TWO homes, and a wordmark ladder measured in each.
+- The heading has TWO homes, and a wordmark measured in each.
 - The navigation rail runs the full height and expands.
 - The rail's travel re-rasters the map card every frame, and `--m3-rail` is 1...
 - A rail toggle also drops frames on the heat canvas, and nothing was changed...

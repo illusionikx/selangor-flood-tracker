@@ -639,12 +639,37 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   worse than none. A worker answering from cache defeats that from a layer the page cannot see.
   It is network-first for everything else too, so a `?v=` bump is still the only cache ritual.
   **Do not "optimise" it to cache-first.** An edit then goes live for nobody until a cache name moves.
-- **The app icons are transparent, so `purpose` must stay `any` — never `any maskable`.** A maskable
-  icon is required to be opaque edge to edge. Declaring a transparent one maskable hands the
-  platform a background of its own choosing. That destroys the reason it is transparent. Same
-  chain. `background_color` is white because it is the *splash* colour, and a blue glyph on a blue
-  splash is invisible. The glyph is blue rather than white. With no plate it lands on a
-  tab strip, a wallpaper and a launcher. White survives only some of those.
+- **The `any` icons are opaque rounded tiles, and the maskable pair carries its own safe zone.**
+  This replaced the opposite rule on 2026-11-25. The old icons were a blue glyph on transparency,
+  so `purpose` had to stay `any`. The Breach icons are a volt tile with a white glyph, so both
+  purposes are right. `icon-192.png` and `icon-512.png` are `any`. They have rounded corners and
+  transparent corner pixels. `icon-maskable-192.png` and `icon-maskable-512.png` are full-bleed
+  squares. The glyph sits at 0.67 of the layout, so its bounding circle stays inside the 80% safe
+  zone that a launcher crops to. **Never declare a rounded tile as `maskable`.** The launcher masks
+  it again and the corners show as a dark ring. **Never declare a full-bleed square as `any`.** A
+  browser then shows a sharp square next to rounded neighbors. `background_color` is volt
+  (`#0038FF`), because it is the launch screen of the installed Android app. `theme_color` stays
+  white, because it tints the title bar and the light theme is white. `icon-build.php` bakes all of
+  them from `icon.svg`.
+- **`icon.svg` must stay a bare glyph with no tile and no fill.** `js/alerts.js` paints the red
+  alert favicon. It draws `icon.svg`, keeps only the alpha of the glyph, and fills that alpha white
+  over a `--s-danger` rounded tile. A tile inside `icon.svg` then comes out as a solid square, and a
+  `fill` attribute is ignored. The same file is the source of the `--i-flood` mask in
+  `css/icons.css`, which paints in `currentColor`. The two numbers `TILE_SCALE` and `TILE_RADIUS` in
+  `js/alerts.js` copy `icon-build.php`. Change them together, or the red icon stops matching the
+  volt one. **The build copies `icon.svg` into `site/`.** It did not before 2026-11-25, so on the
+  build the red favicon failed silently and the tab kept the volt tile.
+- **A filled shape takes `--accent-fill`, and ink takes `--accent`.** The two tokens are equal on the
+  light theme, so a fill written on `--accent` looks right there. On the dark theme `--accent` is the
+  pale `#8AA4FF`, and the fill then reads pastel, with a dark label on it. A label on a fill takes
+  `--on-accent-fill`, which is white on both themes. `--md-sys-color-on-primary` is `--surface` and
+  belongs to the ink accent. **Do not pair `--accent-fill` with `on-primary`.** On the dark theme that
+  puts `#202124` on volt bright. `m3-check.html` reads the FAB, the switch track and the dark brand
+  tile through probes of the two tokens.
+- **The favicon link swaps type as well as `href`.** `index.html` holds an SVG `link[rel=icon]` first
+  and an `.ico` second. `js/alerts.js` reads the first one. It sets `type` to `image/png` for the
+  red data URL, and back to the stored type for the volt SVG. A data URL under a link that still
+  says `image/svg+xml` draws nothing.
 - **Do not add `mobile-web-app-capable` — or put `apple-mobile-web-app-capable` back.** Chrome's
   console deprecates the Apple tag and suggests the unprefixed one. Both are the pre-manifest way of
   asking for standalone. `display: standalone` in `manifest.json` covers it since iOS 11.3.
@@ -653,10 +678,13 @@ frames only exist because we ran when they were taken. To re-test the capture pa
   ever wanted, that tag comes back *with* them and not before.
 - **iOS has its own icon, `icon-180.png`, and needs it.** Safari does not honour alpha on a
   home-screen icon. It flattens it onto a colour of its own choosing, historically black. That is the
-  exact plate that was deliberately removed. So `apple-touch-icon` points at an opaque white tile
-  with a smaller glyph. iOS rounds the corners itself. The squircle bites anything near the edge.
-  The favicon and the manifest keep the transparent pair. **Do not point `apple-touch-icon` back at
-  `icon-192.png`.** It looks right in every browser you can test locally, and black on a phone.
+  exact plate that was deliberately removed. So `apple-touch-icon` points at an opaque square. iOS
+  rounds the corners itself. The squircle bites anything near the edge. Since 2026-11-25 that square
+  is full-bleed volt with the white glyph at 0.85 of the layout. It was a white tile with a blue
+  glyph. **Do not pre-round it.** iOS then rounds it twice. **Do not point `apple-touch-icon` back at
+  `icon-192.png`.** That file has transparent corners. It looks right in every browser you can test
+  locally, and black in the corners on a phone. An iOS install keeps its old icon until someone
+  adds the app to the home screen again.
 - **The icon badge follows the app bar's alert count and nothing else.** `navigator.setAppBadge()` in
   `alerts()`, on `live`. That is the same number the panel's warning glyph is coloured by. The
   district filter and `PREFS.ignored` are already applied, and stale stations are excluded. Never
@@ -2736,7 +2764,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   reader locked out of a flood map is a reader with no water levels. Weigh that against a map in a
   240px keyhole before moving the number, and move it in `js/config.js` only.
   `narrow-test.html` reads `NARROW_PX` out of the source and guards all three silent faults.
-- **The heading has TWO homes, and a wordmark ladder measured in each.** `#brand` is written into
+- **The heading has TWO homes, and a wordmark measured in each.** **Rebranded on 2026-11-25.** The
+  text below describes the old ladder. Now there is one spelling, `FLOOD WATCH` in Archivo Expanded
+  900 at 13px in the rail. The open rail draws the mark and the word, and the phone bar draws the
+  mark alone. The word stays in the page there, clipped to one pixel, so a screen reader still reads
+  the heading. **Do not hide it with `display: none`.** That removes it from the accessibility tree.
+  **If the wordmark font fails to load, the word falls back to Roboto and still fits.** Roboto is
+  narrower. So `title-test.html` also asks `document.fonts.check()`. `#brand` is written into
   `<header>`, which is where a phone keeps it. Above 600px the navigation rail runs the full height
   on the leading edge and the app bar is the ticker's strip, so `js/ui.js` moves the node into the
   rail's brand slot on the breakpoint. A second copy in the markup is a second `<h1>` for a screen
@@ -3014,7 +3048,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `position: absolute; top: 100%` in `css/base.css`, so it contributed nothing to a card that is
   only as tall as its content. The card stayed 66px and clipped 278px of results, with nothing on
   screen to say so.
-- **The app bar wordmark has four spellings and the title rail picks one.** So a specificity slip
+- **The app bar wordmark has four spellings and the title rail picks one.** **Superseded on
+  2026-11-25. One spelling is left, `FLOOD WATCH`. The container-query and specificity lessons below
+  still hold for any box that draws a word by its own width.** So a specificity slip
   draws none of them. `Klang Valley Flood Watch` → `KV Flood Watch` → `KVFW` → the drop alone, at
   282px, 190px and 94px of `header h1`. That is a **container query and not a media query**. The
   rail is what is left after the ticker and the controls, and both of those move on their own.

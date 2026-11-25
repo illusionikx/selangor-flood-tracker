@@ -29,10 +29,15 @@
   /* selected navigation item: ink (inverse surface), not the accent (decided 2026-11-25) */
   --md-sys-color-secondary-container: var(--md-sys-color-inverse-surface);
   --md-sys-color-on-secondary-container: var(--md-sys-color-inverse-on-surface);
+  /* fill and ink split (Phase 1c): a filled shape takes --accent-fill, text and glyphs take --accent */
+  --accent-fill: var(--brand-volt);
+  --on-accent-fill: #FFFFFF;
 }
 :root[data-theme="dark"] {
-  /* was #8ab4f8. 6.77:1 on #202124, 5.47:1 on #303134; text on it stays --surface. */
+  /* was #8ab4f8. 6.77:1 on #202124, 5.47:1 on #303134. Ink only: text, glyphs, focus ring. */
   --accent: var(--brand-volt-light);
+  /* volt bright: 3.1:1 against #202124, white label 5.17:1 */
+  --accent-fill: #2F5BFF;
 }
 
 /* The wordmark, everywhere it is set as text */
@@ -46,7 +51,7 @@
   font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 13px;
   letter-spacing: .02em; text-transform: uppercase; white-space: nowrap;
 }
-.btn.primary   { background: var(--accent); color: var(--md-sys-color-on-primary); }
+.btn.primary   { background: var(--accent-fill); color: var(--on-accent-fill); }
 .btn.secondary { background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); }
 .btn.text      { background: none; color: var(--md-sys-color-on-surface); text-decoration: underline; text-underline-offset: 3px; }
 .btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }

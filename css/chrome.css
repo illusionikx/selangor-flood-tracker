@@ -163,35 +163,37 @@ header {
   font-size: 22px; font-weight: 400; letter-spacing: 0; min-width: 0;
   container-type: inline-size;
 }
-#brand .word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* The wordmark shortens before it clips: Klang Valley Flood Watch -> KV Flood Watch -> the drop
-   alone. Measured at 22px Roboto, the two spellings are 247 and 156px wide, and the drop with its
-   gap adds 32. So each step is the width it needs plus about 2px of slack. The ellipsis is still
-   there under both of them, for a rail between the two steps. Remeasure both if the font, the size
-   or the words change.
-   **There were three spellings, and `KVFW` is gone.** Every box `#brand` can ever occupy is fixed
-   now — a 164px expanded rail and a ~viewport phone bar, and a collapsed rail draws no heading at
-   all — never a value that varies continuously the way a shared header row once did. `KVFW`'s own
-   thresholds sat at 75 to 147px in the rail and 190 to 282px in the bar, and no real box ever lands
-   there: the expanded rail is a fixed 164px, past the top of that range. A
-   spelling with no box to draw it in is a span, a rule and a threshold that all state a fact about
-   nothing, so `title-test.html`'s own reachability check is what caught it — see that file's
-   comment for the three rungs that do exist and where each one draws. */
-/* **One spelling left, and `.w-lg` is gone.** `Klang Valley Flood Watch` needed 279px in the phone
-   bar and 215 in the rail. The bar became a 40px pill shared with the news, so the brand there is
-   32px of mark, and the open rail is 164px. No box in this app can draw it any more. A rung with no
-   box is a span, a rule and a threshold that all state a fact about nothing — the rule this file
-   already acted on once, when `KVFW` went the same way. */
-#brand .word > span { display: none; }
-#brand .word > .w-md { display: inline; }
-/* **The drop-alone rung is gone, and its threshold with it.** It hid the word under 93px of
-   container. Every box this heading can occupy is fixed and both are wider: 164px in an open rail
-   and 92px in the phone bar, which draws `KVFW` and needs 91.31 of that. A collapsed rail draws no
-   heading at all. So the rule stated a fact about nothing, which is what this file already deleted
-   `KVFW` and `.w-lg` over once each. `title-test.html`'s own reachability check is what names it. */
-#brand b { font-weight: 500; color: var(--accent); }
+/* The wordmark is `FLOOD WATCH`, one spelling, in Archivo Expanded 900. The brand kit sets it in
+   capitals. The markup keeps sentence case and `text-transform` draws the capitals, so a screen reader
+   reads words. It draws only where the box is wide enough, and it never ellipsises. A word that
+   clips is a wrong name.
+   **Three boxes, three fixed answers.** A shut rail draws no heading at all. An open rail draws the
+   mark and the word. The phone bar draws the mark alone, and the word stays in the page for a screen
+   reader. No box in this app varies continuously. `title-test.html` reads all three back in rendered
+   pixels.
+   **`KLANG VALLEY` is not in this lockup.** The brand kit sets it as a descriptor under the word.
+   The open rail has no height to spare for it, so it lives in the About box and on the splash. */
+#brand .word {
+  display: none; overflow: hidden; white-space: nowrap;
+  font-family: var(--font-display); font-stretch: 125%; font-weight: 900;
+  letter-spacing: -0.02em; text-transform: uppercase; color: var(--on-surface);
+}
 #brand .brand { font-size: 24px; color: var(--accent); flex: none; }
+/* **On the dark theme the mark is the TILE, since 2026-11-25 (MIGRATION.md Phase 1c).** A pale ink
+   glyph on a dark surface lost the brand. So the mark draws as the app icon does: an `--accent-fill`
+   rounded square with the white glyph. The tile keeps the 24px box the glyph had, so the rail column
+   and `title-test.html`'s arithmetic do not move. The glyph takes 0.8 of the tile and the corner is
+   22.37%, the same two numbers as `icon-build.php`. The light theme keeps the volt glyph, which is
+   already bold on white.
+   **`:is(#rail, header)` is specificity, not tidiness.** `#rail #brand .brand` states 24px with two
+   ids, and a one-id rule loses to it. */
+:root[data-theme="dark"] :is(#rail, header) #brand .mark {
+  width: 24px; height: 24px; align-items: center; justify-content: center;
+  border-radius: 22.37%; background: var(--accent-fill);
+}
+:root[data-theme="dark"] :is(#rail, header) #brand .brand {
+  font-size: 19.2px; color: var(--on-accent-fill);
+}
 /* Just the glyph's own box, so the status dot has a corner to hang off. `cursor: help` and the hover
    target are on the mark rather than the whole h1: the wordmark is a title, not a control. */
 #brand .mark { position: relative; display: flex; flex: none; cursor: help; }
@@ -260,7 +262,7 @@ body:not(.ready) #rail { transition: none; }
   box-sizing: border-box; min-width: 56px; height: 56px; margin-block-start: 8px;
   padding: 0; border: 0; cursor: pointer;
   border-radius: var(--md-sys-shape-corner-large);
-  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+  background: var(--accent-fill); color: var(--on-accent-fill);
   box-shadow: var(--shadow);
   transition: padding var(--m3-rail);
 }
@@ -277,48 +279,26 @@ body:not(.ready) #rail { transition: none; }
   transition: max-width var(--m3-rail), margin-inline-start var(--m3-rail);
 }
 #rail .railfab:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
-/* **The brand is smaller in the rail than in the bar, and the ladder is measured twice for it.**
-   The app bar draws it at 22px across up to 300px of rail. This column has 180px between its own
-   padding, and `KV Flood Watch` needs 156 of those at 22px against the 148 that are left once the
-   drop and its gap are out. So the rail draws `title-medium` instead, which is the size a brand
-   lockup takes in navigation, and the whole spelling fits.
-   The ladder still measures. It is the same three spellings chosen by the width of the box they sit
-   in, and the thresholds below are that box's numbers rather than the bar's. Two homes, two
-   measurements, and `title-test.html` reads both back in rendered pixels. */
-/* **A definite `width`, never `flex: none`.** `container-type: inline-size` puts inline-size
+/* **The brand is 13px in the rail.** `FLOOD WATCH` in Archivo Expanded is wide. At 15px the lockup
+   needs about 176px against a 164px box. At 13px the lockup needs 153px, so it fits. The owner chose 13px over a wider box on 2026-11-25.
+   **A definite `width`, never `flex: none`.** `container-type: inline-size` puts inline-size
    containment on this box, and a contained box cannot take its width from its own content. So
-   `flex: none` measured 0 and the whole lockup vanished. That is the trap `#brand`'s own comment
-   already states from the other side, and it reads as a missing element rather than as a sizing
-   rule. 56px is the width every indicator pill in this rail takes, so the drop stands in the same
-   column as the glyphs under it. 180 is the 220px rail less its own 20px of inline padding. */
-#rail #brand {
-  flex: none; width: 56px; max-width: none;
-  font-size: var(--md-sys-typescale-title-medium-size);
-  font-weight: var(--md-sys-typescale-title-medium-weight);
-}
-/* **164, not 180.** It was the 220px rail less its own 20px of inline padding. `.railbrand` now
-   leads with 16px more, to put the mark on the item glyph column, and this box gives that up rather
-   than overflow a rail that clips. The rungs below are unchanged by it: `.w-md` needs 145 and
-   `.w-lg` needs 213, so 164 draws the same spelling 180 did. */
+   `flex: none` measured 0 and the whole lockup vanished. It reads as a missing element and not as a
+   sizing rule. 56px is the width every indicator pill in this rail takes, so the mark stands in the
+   same column as the glyphs under it. */
+#rail #brand { flex: none; width: 56px; max-width: none; font-size: 13px; }
+/* **164, not 180.** `.railbrand` leads with 16px of padding, to put the mark on the item glyph
+   column, and the 220px rail has 20px of inline padding on each side. */
 body.railopen #rail #brand { width: 164px; }
-/* **24px, the same as every other glyph in this column.** `.brand` is the MARK, not the wordmark:
-   the word takes `title-medium` from `#rail #brand` above. The mark was 22px, sized to pair with a
-   16px word, and it then stood one size under the six glyphs beneath it on the same column. A
-   lockup that pairs internally and disagrees with its neighbours is the fault a reader sees. */
+/* **24px, the same as every other glyph in this column.** A lockup that pairs internally and
+   disagrees with its neighbors is the fault a reader sees. */
 #rail #brand .brand { font-size: 24px; }
-/* **The rail's own rungs, measured in this rail at this size.** Two ids, so they beat the bar's
-   one-id rules above whichever way the cascade runs. The bar draws 22px text across up to 300px and
-   these numbers are neither of those.
-   Measured at `title-medium` 16px: the two spellings are 181 and 113px wide, and the drop with its
-   gap adds 32. So each rung is the width it needs plus 2px of slack. Remeasure both if the font,
-   the size or the words change — `title-test.html` reads them back in rendered pixels.
-   **The drop was 30 and is 32**, because the mark went to 24px to stand in the same column as the
-   six glyphs under it. The threshold moved 2px with it.
-   **One threshold, because there is one spelling.** `.w-lg` needed 215px and no box in this app
-   reaches it any more, so it is deleted rather than left as a rule nothing can satisfy.
-   The container is 164px expanded, and a shut rail draws no heading at all. */
-@container (min-width: 147px) {
-  #rail #brand .word > .w-md { display: inline; }
+/* **The word draws when its box holds it.** The threshold is the measured width of the mark, the
+   gap and the word, plus about 2px of slack. It measured 153px on 2026-11-25. Measure it again if
+   the face, the size or the words change. `title-test.html` reads it back in rendered pixels. The
+   query runs on the heading's own box, so a shut rail never draws the word. */
+@container (min-width: 155px) {
+  #rail #brand .word { display: inline; }
 }
 
 /* **Every glyph in this rail stands on one column, and three of them did not.**
@@ -420,8 +400,8 @@ body.railopen #rail .railitem:focus-visible {
    lighting up. Expanded, the ROW is the indicator, so the layer moves onto the row. That is the same
    move the selected fill already makes, and it is why these are two blocks rather than one.
    **A selected surface takes its own content colour AND its own container.** The selected pill is
-   `--accent` here. `on-surface` at 8% over it is invisible on the light theme and a grey wash on the
-   dark one, and a mix ending in `transparent` erases the fill outright.
+   the ink here (`inverse-surface`, the accent until 2026-11-25). The hover layer therefore mixes
+   `inverse-on-surface` into it, and a mix ending in `transparent` erases the fill outright.
    **`:active` and not `:focus`.** A focus ring already answers the keyboard on all four controls,
    and M3 gives focus and pressed the same 10%. Two marks for one state is one too many. */
 body:not(.railopen) #rail .railitem:hover .railpill {
@@ -456,14 +436,15 @@ body.railopen #rail .railitem[aria-current="page"]:active {
   background: color-mix(in srgb, var(--md-sys-color-on-secondary-container)
     var(--m3-state-press), var(--md-sys-color-secondary-container));
 }
-/* The FAB's own pair: `on-primary` over `primary`, the same shape the selected item takes. */
+/* The FAB's own pair: its label over its fill, the same shape the selected item takes. It is a
+   FILL, so it takes `--accent-fill` and not the ink `--accent`. See base.css. */
 #rail .railfab:hover {
   background: color-mix(in srgb,
-    var(--md-sys-color-on-primary) var(--m3-state-hover), var(--md-sys-color-primary));
+    var(--on-accent-fill) var(--m3-state-hover), var(--accent-fill));
 }
 #rail .railfab:active {
   background: color-mix(in srgb,
-    var(--md-sys-color-on-primary) var(--m3-state-press), var(--md-sys-color-primary));
+    var(--on-accent-fill) var(--m3-state-press), var(--accent-fill));
 }
 /* The rail toggle. `.icon:hover` in `css/base.css` fills a 40px disc with `--hover`, this app's
    container TONE. That is a surface rather than a state layer, and the theme button below now wears
@@ -496,7 +477,7 @@ body.railopen #rail .railitem[aria-current="page"]:active {
    `surface-container-highest` container under an `on-surface-variant` glyph, which this app's bridge
    in `css/base.css` resolves to `--hover` under `--muted`.
    **Not the tonal variant.** M3 fills that one with `secondary-container`, and this app bridges that
-   role to `--accent` — the selected rail indicator's own fill. An accent disc at the foot of this
+   role to the ink — the selected rail indicator's own fill. An ink disc at the foot of this
    column reads as a seventh destination, and a selected one.
    **The rail alone, because the button has two homes.** Below 600px it is the app bar's trailing
    action, and an app bar action is a standard icon button with no container. `#railApps .i` beside
@@ -774,15 +755,15 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
 /* A MET warning tile. It shares the shape of .tk-i. Its colour comes through --c, set inline in
    js/ticker.js to --k-weather, not a kind colour. */
 #ticker .tk-warn .i { color: var(--c); }
-/* The app's name, closing every set. Same lockup as the app bar and the splash — the drop and the
-   `<b>` in the accent, the first half in the ordinary tile ink — so the divider reads as the app
-   rather than as another row of telemetry.
-   It is still not a target. `.tk-i:hover b` would tint and underline it like a station you can go
-   to, so both halves of that rule are restated here. */
+/* The app's name, closing every set. Same lockup as the rail: the mark in the accent and the word in
+   Archivo Expanded capitals, in the ordinary tile ink. The divider then reads as the app and not as
+   another row of telemetry.
+   It is still not a target. `.tk-i:hover b` would tint and underline a tile you can go to. The
+   word is not a `<b>` any more, so the rule below states only what the hover must not do. */
 #ticker .tk-brand { cursor: default; }
 #ticker .tk-brand .i { color: var(--accent); }
-#ticker .tk-brand b { font-weight: 500; color: var(--accent); }
-#ticker .tk-brand:hover b { color: var(--accent); text-decoration: none; }
+#ticker .tk-brand .lk-word { font-size: 13px; }
+#ticker .tk-brand:hover .lk-word { text-decoration: none; }
 /* A district tile, drawn above BY_DISTRICT alerts. The glyph is neutral ink, never a kind colour:
    one tile holds several kinds and several tiers, and the tier colour lives on each count. */
 #ticker .tk-dist .i { color: var(--muted); }
@@ -885,21 +866,26 @@ body.railopen #rail .railbadge { top: -6px; right: -6px; }
    box, so the row measures as tall as the title rather than as tall as the button. */
 .modalhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 
-/* The mark: drop + two-line wordmark, the same lockup as the app bar and the splash, just bigger.
-   On its own centred line — it is the dialog's identity, not a row of the header, and sharing a
-   line with a mode switch made it read as one more control.
-
-   `align-items: center` on the drop rather than baseline: it is a picture beside two lines of text,
-   and baseline-aligning it to the first line hangs it off the top. */
+/* The lockup in the About box: the mark, over the wordmark, over the descriptor. The brand kit calls
+   it the stacked lockup. It is the dialog's identity and not a row of the header, so it stands on
+   its own centred line. `.lk-word` and `.lk-desc` are shared with the splash. The app bar and the
+   rail draw the word alone, because they have no height for a descriptor.
+   The wordmark is Archivo Expanded 900 in capitals. The descriptor is JetBrains Mono 500, spaced
+   wide, also in capitals. The markup keeps sentence case, and `text-transform` draws the capitals. */
 .logo {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   text-align: center; margin: 2px 0 20px; padding: 22px 0 14px;
 }
-.logo .i { font-size: 40px; color: var(--accent); flex: none; }
-/* Left-aligned inside a centred lockup: the two words stack under each other rather than pivoting
-   about a centre line, which is what makes it read as a wordmark and not as a caption. */
-.logo span { font-size: 20px; font-weight: 400; line-height: 1.15; letter-spacing: 0; text-align: left; }
-.logo b { font-weight: 500; color: var(--accent); }
+.logo .i { font-size: 56px; color: var(--accent); flex: none; }
+.lk-word {
+  font-family: var(--font-display); font-stretch: 125%; font-weight: 900; line-height: 1;
+  letter-spacing: -0.02em; text-transform: uppercase; color: var(--on-surface);
+}
+.lk-desc {
+  font-family: var(--font-mono); font-weight: 500; font-size: 11px; line-height: 1;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
+}
+.logo .lk-word { font-size: 28px; }
 .modalhead h2 { flex: 1; min-width: 0; margin: 0; }
 .modalhead .dclose { margin: -8px -10px -8px 0; font-size: 20px; }
 .modalhead form { margin: 0; }
@@ -1003,8 +989,8 @@ body.testmode header {
      The two agreed by luck until `--pane` moved to 24, and then the header's own offsets bled 6px
      past the pane on each side. `--pane: 16px` is set once, in the compact block further down. */
   #aboutBox .logo { margin-bottom: 12px; padding: 30px 0 8px; }
-  #aboutBox .logo .i { font-size: 34px; }
-  #aboutBox .logo span { font-size: 18px; }
+  #aboutBox .logo .i { font-size: 44px; }
+  #aboutBox .logo .lk-word { font-size: 22px; }
   /* Two columns would be 219px of pins against 105px of prose at 360px wide — and that is the pin
      row after it grew by half. Stack instead — the thing above what it means is the same reading
      order, just turned a corner. */
@@ -1124,7 +1110,7 @@ body.testmode header {
 .docbox .hshot figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
 .docbox :is(.hmark, .hnum) {
   display: inline-grid; place-items: center; flex: none; border-radius: 50%;
-  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+  background: var(--accent-fill); color: var(--on-accent-fill);
   font: 600 11px/1 Roboto, sans-serif;
 }
 .docbox .hmark {
@@ -1326,7 +1312,7 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
 #settingsBox .mlist > li.fold.shut { max-height: 0; min-height: 0; padding-block: 0; opacity: 0; }
 @media (prefers-reduced-motion: reduce) { #settingsBox .mlist > li.fold { transition: none; } }
 #settingsBox .mslide { flex: none; display: flex; align-items: center; gap: 8px; }
-#settingsBox .mslide input { width: 120px; accent-color: var(--accent); }
+#settingsBox .mslide input { width: 120px; accent-color: var(--accent-fill); }
 #settingsBox .mslide b {
   min-width: 4ch; text-align: right; font-weight: 500;
   font-variant-numeric: tabular-nums; color: var(--muted);
@@ -1399,11 +1385,13 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
 /* `.msw.on` beside every `:has(:checked)`. Chromium does not restyle a `:has()` subject when a
    script sets the box, and `#hideFaulty` lands checked from `PREFS`. The same repair `setBox()`
    gives a chip. */
+/* The checked track is a FILL, so it takes `--accent-fill` and its thumb `--on-accent-fill`. M3
+   names `primary` and `on-primary`, and this app splits fill from ink. See base.css. */
 .msw:is(:has(:checked), .on) .mswtrack {
-  border-color: var(--md-sys-color-primary); background: var(--md-sys-color-primary);
+  border-color: var(--accent-fill); background: var(--accent-fill);
 }
 .msw:is(:has(:checked), .on) .mswthumb {
-  width: 24px; height: 24px; background: var(--md-sys-color-on-primary); transform: translateX(24px);
+  width: 24px; height: 24px; background: var(--on-accent-fill); transform: translateX(24px);
 }
 .msw:active .mswthumb { width: 28px; height: 28px; transform: translateX(2px); }
 .msw:is(:has(:checked), .on):active .mswthumb { transform: translateX(22px); }
@@ -2152,7 +2140,7 @@ table.data .dash { color: var(--outline); }
    left edge, so the fraction reads as filling the bar rather than growing from its centre. */
 #camBar::after {
   content: ''; position: absolute; inset: 0; transform-origin: 0 50%;
-  background: var(--accent);
+  background: var(--accent-fill);
   transform: scaleX(var(--p, 0)); transition: transform .2s ease;
 }
 @media (prefers-reduced-motion: reduce) { #camBar, #camBar::after { transition: none; } }
@@ -3928,7 +3916,7 @@ body.side #side { display: flex; }
   border-radius: 2px; transform: translateY(-50%); pointer-events: none;
 }
 .tltrack::before { right: 8px; background: var(--outline); }
-.tltrack::after  { width: calc((100% - 16px) * var(--p, 0)); background: var(--accent); z-index: 1; }
+.tltrack::after  { width: calc((100% - 16px) * var(--p, 0)); background: var(--accent-fill); z-index: 1; }
 /* The alert strip: the spans of the window when a sensor within CAM_ALERT_KM was at danger or was
    forecast to reach it, in the same status colours everything else on this page uses. It replaced a
    mark per stored frame — 60 hairlines is a ruler, and a ruler over a control you have to drag reads
@@ -3972,11 +3960,11 @@ body.side #side { display: flex; }
    edge; Firefox centres it itself. The ring is what keeps it on a white sky. */
 #tlscrub::-webkit-slider-thumb {
   -webkit-appearance: none; width: 13px; height: 13px; margin-top: -4.5px;
-  border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1px #0006;
+  border-radius: 50%; background: var(--accent-fill); box-shadow: 0 0 0 1px #0006;
 }
 #tlscrub::-moz-range-thumb {
   width: 13px; height: 13px; border: 0; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 0 1px #0006;
+  background: var(--accent-fill); box-shadow: 0 0 0 1px #0006;
 }
 /* One control, not six buttons. These are mutually exclusive — picking a range unpicks the others —
    and as separate outlined pills each looked independently pressable, with nothing in the row saying
@@ -4009,10 +3997,10 @@ body.side #side { display: flex; }
 .tls, .tlr.on .tll { width: auto; opacity: 1; }
 .tll, .tlr.on .tls { width: 0;    opacity: 0; }
 .tlr:hover:not(.on) { color: var(--on-surface); }
-/* Text on the accent is `--surface`, never `#fff`. The accent flips to a pale blue (#8ab4f8) in the
-   dark theme, where white on it is a contrast failure — the token is already near-black there and
-   already white in the light theme, so one declaration is correct in both. */
-.tlr.on { color: var(--surface); background: var(--accent); }
+/* A selected speed is a FILL, so it takes `--accent-fill` and its label `--on-accent-fill`. Those
+   are volt and white on the light theme, and volt bright and white on the dark. It used to take the
+   pale ink accent with `--surface` text, which read pastel on the dark theme. See base.css. */
+.tlr.on { color: var(--on-accent-fill); background: var(--accent-fill); }
 @media (prefers-reduced-motion: reduce) { .tlr, .tls, .tll { transition: none; } }
 
 /* --- PLAYER_OVERLAY: the same controls, laid over the picture -----------------------------------
@@ -4129,7 +4117,8 @@ body.side #side { display: flex; }
 /* Splash: covers the map until the first poll lands. */
 #splash {
   position: fixed; inset: 0; z-index: 900; display: grid; place-content: center;
-  justify-items: center; gap: 16px; background: var(--surface); text-align: center;
+  justify-items: center; gap: 16px; text-align: center;
+  background: var(--brand-volt); color: var(--brand-paper);
   transition: opacity .3s ease, visibility .3s;
 }
 /* `pointer-events` is the load-bearing one here, and it is deliberately not in the transition list
@@ -4143,19 +4132,37 @@ body.side #side { display: flex; }
    a screen reader. This is the same spec sentence as the `#gotoBox` focus trap in CLAUDE.md, seen
    from the other end: there a transitioned `visibility` refused a focus, here it accepted a click. */
 #splash.gone { opacity: 0; visibility: hidden; pointer-events: none; }
-#splash .mark { font-size: 48px; color: var(--accent); }
-#splash h1 { font-size: 22px; font-weight: 400; }
-#splash h1 b { font-weight: 500; color: var(--accent); }
+/* **The splash is a brand moment: volt field, white mark, white wordmark.** It is the one surface in
+   the app that paints the brand colour as a background. It is the same on both themes, because the
+   brand does not change with the theme. The status colors never land on volt. The offline and server
+   warnings sit in a white card, below, and the card pins the light theme's values. */
+#splash .mark { font-size: 56px; color: var(--brand-paper); }
+#splash h1 { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0; }
+#splash .lk-word { font-size: 32px; color: var(--brand-paper); }
+#splash .lk-desc { color: color-mix(in srgb, var(--brand-paper) 78%, transparent); }
 /* Shared by the splash and the lightbox — same wait, same indicator. */
 .spin {
   width: 26px; height: 26px; border: 3px solid var(--outline); border-top-color: var(--accent);
   border-radius: 50%; animation: spin .8s linear infinite;
 }
+/* On volt the ring is white. The shared ring is grey and blue, and neither reads on this field. */
+#splash .spin {
+  border-color: color-mix(in srgb, var(--brand-paper) 30%, transparent); border-top-color: var(--brand-paper);
+}
 /* The status lines grow to a sentence on a slow cold start; hold the width so the splash doesn't
    reflow around them, and reserve two lines so it doesn't jump as they change. */
 #splashMsg { max-width: 320px; min-height: 2.8em; line-height: 1.4; }
+#splash #splashMsg { color: color-mix(in srgb, var(--brand-paper) 85%, transparent); }
 #splash.offline .spin, #splash.offline #splashMsg { display: none; }
-#splashWarn { max-width: 320px; }
+/* **The warning card is white and it pins the light theme.** A card of the theme's own surface would
+   go dark on the dark theme and put a status red on volt beside it. These five tokens are the light
+   theme's values. A theme flip never reaches them, and the status mix inside `.state` then reads on
+   white. Update them if the light theme's ink, muted or outline move. */
+#splashWarn {
+  max-width: 320px; padding: 16px 20px; border-radius: 12px; color-scheme: light;
+  --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0; --accent: var(--brand-volt);
+  background: var(--surface); color: var(--on-surface);
+}
 #splashWarn .state { display: flex; align-items: center; justify-content: center; gap: 8px; }
 #splashWarn .state .i { font-size: 20px; }
 #splashWarn p { margin: 12px 0; font-size: 12px; line-height: 1.6; text-align: left; }
@@ -4210,29 +4217,18 @@ body.side #side { display: flex; }
   /* **`--hdr` is 0 here too, and the header is the same pill it is on a desktop.** It was 85px of
      two-row bar: the brand on line one and the ticker on line two. The repository owner asked for
      that space back on 2026-08-24. */
-  /* **The mark and the short spelling, centred in the bar.** The repository owner asked for the
-     glyph on 2026-08-24, then for `KV Flood Watch` in its place, then for the two together on
-     2026-08-25. `#brand b` paints `FW` in `--accent` at both widths, so the styling is the rail's
-     own and this block states none of it.
-     `container-type: inline-size` contains this box, so the width is stated rather than left to the
-     content — the rule the rail states from its own side. 92px is what the lockup measures: a 24px
-     mark, the heading's own 8px gap and 59.31px of `KVFW` at 22px Roboto. Remeasure it if the font,
-     the size or the letters change.
-     **It clears the two trailing buttons at every width this app answers for.** That group is 80px
-     wide at `right: 8px` and the bar centres the brand on the WINDOW, so the lockup needs
-     92 + 176 = 268px of window. `NARROW_PX` blocks the page under 300px. So the two never meet, and
-     no cap has to hold them apart. */
-  #brand { flex: none; width: 92px; max-width: none; }
-  /* The long spelling has no box left below 600px, and the short one has no box above it. So the
-     two swap here rather than ladder. */
-  #brand .word > .w-md { display: none; }
-  #brand .word > .w-sm { display: inline; }
-  /* **The phone wordmark ladder is gone, because its box is gone.** This block recalibrated the
-     crossing for a heading that had a whole row to itself, 288 to 588px wide. The brand is 32px of
-     mark in a shared pill now, so no phone width draws a spelling at all and there is nothing left
-     to calibrate. `.w-lg` went with it: the open rail is 164px and `.w-lg` needs 215, so no box in
-     this app can draw it any more. A rung with no box is dead weight in three files, which is the
-     rule `title-test.html` already states and already acted on once. */
+  /* **The mark alone, centred in the bar.** The brand is 24px of mark in a shared pill. The word
+     does not fit beside it at this width, and the repository owner chose the mark alone on
+     2026-11-25. The word stays in the page, clipped to one pixel, so a screen reader still reads the
+     heading `Flood Watch`. `display: none` would remove it from the accessibility tree.
+     `container-type: inline-size` contains this box, so the width is stated and never taken from the
+     content. 24px is the mark. It clears the two trailing buttons at every width this app answers
+     for. That group is 80px wide at `right: 8px` and the bar centres the brand on the WINDOW. */
+  #brand { flex: none; width: 24px; max-width: none; }
+  #brand .word {
+    display: block; position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    clip-path: inset(50%);
+  }
   /* **The ramp has no phone rule any more.** It stated 18px, and the base rule states
      `min(56px, 9%)`, which is 32px here. Nothing else about the pill changes: every token in its
      offsets is 0 on a phone, so the base rule already lands it 12px inside a full-bleed map. */

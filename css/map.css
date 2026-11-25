@@ -729,7 +729,8 @@ details.sensor[open] > summary .chev { transform: rotate(180deg); }
    with a divider between them.
    That replaced a 2px accent outline on the now step. An M3 list item states no outline, and a ring
    of the accent reads as keyboard focus. A selected fill was not used either. This app bridges
-   `secondary-container` to the full accent, so that fill draws a solid blue row.
+   `secondary-container` to the ink (the full accent until 2026-11-25), so that fill draws a solid
+   dark row.
    The subheader takes the numbers `.nsub` and `#settingsBox h3` state: `title-small` in
    `on-surface-variant`, 48dp. The divider is `.sensor + .sensor`'s own rule. */
 .sbody > li.wxsub {

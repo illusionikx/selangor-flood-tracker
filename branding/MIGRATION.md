@@ -15,6 +15,7 @@ blue replaces the old accent and owns the brand moments (mark, wordmark, splash,
 | Readings in JetBrains Mono | **Now, with the rebrand.** Phase 6 is part of the main sequence, not optional. |
 | Installed Android app launch screen | **Volt blue.** `manifest.json` `background_color: #0038FF`. |
 | Buttons | **Bold.** Filled volt primary, filled ink secondary, underlined text button; Archivo Expanded capitals; 12px corners; 48px tall. Phase 5b. |
+| Dark-theme boldness | **Split fill from ink.** Filled controls use volt bright `#2F5BFF` with white labels on dark; text, glyphs and focus ring stay `#8AA4FF`. Phase 1c, part of R1. |
 | Sensor kind colours | **Vivid.** One chroma for all kinds, 0.119 → 0.150; hues and the three lightnesses unchanged. Phase 1b. |
 
 ---
@@ -87,6 +88,37 @@ Where: `css/base.css` 268–287 (paper), 413–417 (dark), 503–507 (pin and pa
 
 **CLAUDE.md (Colour language)** must change with it: “One chroma for all six, at 0.119” → 0.150, with the date and
 the reason (the owner asked for bolder kind colours), and the gauge/amber cost added to the costs it lists.
+
+## Phase 1c · Dark theme keeps its boldness (decided 2026-11-25, after seeing R1 on the branch)
+
+**Problem seen on `brand/r1-identity`.** In the dark theme `--accent` is the pale `#8AA4FF`, and every FILLED
+surface takes it: the Search FAB, primary buttons, the switch track, selected checks. Pale periwinkle with dark
+text reads pastel, and the brand loses the boldness it has in the light theme.
+
+**Fix: split fill from ink.** One token cannot do both jobs on a dark ground. Volt as text on `#202124` is about
+2.3:1, so links and glyphs need the light tint; a filled shape does not.
+
+```css
+:root {
+  --accent-fill: var(--brand-volt);          /* #0038FF, white label 6.98:1 */
+  --on-accent-fill: #fff;
+}
+:root[data-theme="dark"] {
+  --accent: var(--brand-volt-light);          /* unchanged: links, glyphs, focus ring, text */
+  --accent-fill: #2F5BFF;                     /* volt bright: 3.1:1 against #202124, white label 5.17:1 */
+  --on-accent-fill: #fff;
+}
+```
+
+- Bridge `--md-sys-color-primary-container`-style FILLS to `--accent-fill` / `--on-accent-fill`: the FAB
+  (`#railFind`), `.btn.primary`, the M3 switch's checked track (`.mswtrack`), filled chips' selected state.
+- Everything drawn as ink keeps `--accent`: links, `.i` glyphs, the focus ring, `.tbtn` / `.btn.text`.
+- `--md-sys-color-on-primary` stays `--surface` for anything still filled with `--accent`; audit each
+  `background: var(--accent)` / `var(--md-sys-color-primary)` in `css/*.css` and move the fills over.
+- **The mark in the rail and app bar:** in the dark theme draw it as the tile (a `--accent-fill` rounded square
+  with the white glyph), not a pale glyph, so the brand reads the same on both themes.
+- `tokens/tokens.json` gains `accentFill` (`#0038FF` / `#2F5BFF`). `m3-check.html` reads the FAB and switch
+  colours; update the expected values. Add the split to CLAUDE.md's colour language.
 
 ## Phase 2 · Fonts
 

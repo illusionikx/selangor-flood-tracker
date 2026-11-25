@@ -34,17 +34,29 @@
      differently-spelled legacy one. The single thing that still needs the Apple tag is
      `apple-touch-startup-image`, and we ship no startup images. -->
 <meta name="apple-mobile-web-app-title" content="Flood Watch">
+<!-- The link preview. `og:image` must be an absolute URL, so it is relative here and the Pages bake
+     writes the full one (`--origin=` in build.mjs). The server build keeps it relative, because
+     nothing in this repository knows that host's public name. The CSP needs no line: a crawler
+     fetches the image, and the page never does. -->
+<meta name="description" content="Live flood telemetry for Selangor, Kuala Lumpur and Putrajaya: river levels, rainfall, sirens and flood-depth gauges on one map.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Klang Valley Flood Watch">
+<meta property="og:description" content="Live flood telemetry for Selangor, Kuala Lumpur and Putrajaya, on one map.">
+<meta property="og:image" content="og-image.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="manifest" href="manifest.json">
 <!-- `?v=` for the same reason the stylesheets carry one: Herd serves everything with a three-hour
      max-age, and a browser holds a favicon far longer than that anyway. The file name never changes
-     when the mark does, so this is the only thing that makes a new icon appear. Bump all four
-     (here, and the two srcs in manifest.json) whenever icon-build.php reruns. -->
-<link rel="icon" href="icon-192.png?v=3" type="image/png">
-<!-- iOS gets its own tile. It does not honour an alpha channel on a home-screen icon — it flattens
-     it onto a colour of its choosing, historically black — so the transparent icon above would come
-     back plated in exactly the thing that was deliberately removed. This one is opaque white on
-     purpose, with a smaller glyph because iOS rounds the corners itself. Built by icon-build.php. -->
-<link rel="apple-touch-icon" href="icon-180.png?v=3">
+     when the mark does, so this is the only thing that makes a new icon appear. Bump every one
+     (here, and the four srcs in manifest.json) whenever icon-build.php reruns. The favicon is a
+     vector tile. js/alerts.js swaps this link's href for a red PNG while a station is at danger.
+     It reads the first `link[rel=icon]`, so the SVG stays first. -->
+<link rel="icon" href="favicon.svg?v=4" type="image/svg+xml">
+<link rel="icon" href="favicon.ico?v=4" sizes="48x48">
+<!-- iOS gets its own square. It does not honour an alpha channel on a home-screen icon. It flattens
+     the alpha onto a colour of its own choosing. So this icon is an opaque volt square with no
+     rounded corners, because iOS rounds the corners itself. Built by icon-build.php. -->
+<link rel="apple-touch-icon" href="icon-180.png?v=4">
 <!-- The only third party this page contacts is CARTO's tile host. It answers on `a` to `d` and on
      the bare host as well, and js/map.js asks the bare host, so one line covers every tile.
      No `crossorigin` here. Leaflet sets no `crossOrigin` on its tile layer, so the tiles load as
@@ -101,7 +113,7 @@
 <link rel="modulepreload" href="js/lazy.js">
 <link rel="modulepreload" href="js/ui.js">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="vendor/fonts.css?v=52">
+<link rel="stylesheet" href="vendor/fonts.css?v=53">
 <link rel="stylesheet" href="css/icons.css?v=108">
 <!-- M3's own token scales, baked from the M3 Expressive component set by `php m3-build.php`.
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
@@ -249,7 +261,7 @@
 </dialog>
 <div id="splash">
   <div class="mark"><i class="i i-flood"></i></div>
-  <h1>Klang Valley <b>Flood Watch</b></h1>
+  <h1><span class="lk-word">Flood Watch</span><span class="lk-desc">Klang Valley</span></h1>
   <div class="spin"></div>
   <div class="muted" id="splashMsg">fetching stations from JPS…</div>
   <div id="splashWarn" hidden>
@@ -284,10 +296,7 @@
        and ARIA forbids a naming attribute on that role — `aria-label` may not be exposed at all.
        The mark is focusable and opens a popover, so it needs a role that admits a name. -->
   <h1 id="brand"><span class="mark" role="button" tabindex="0" aria-label="Feed diagnostics"
-        ><i class="glyph brand i i-flood"></i></span><span class="word"
-      ><span class="w-md">KV <b>Flood Watch</b></span
-      ><span class="w-sm">KV<b>FW</b></span
-  ></span></h1>
+        ><i class="glyph brand i i-flood"></i></span><span class="word">Flood Watch</span></h1>
   <!-- **The leading slot holds the overflow menu since 2026-10-14**, on the repository owner's
        instruction. The search held it from 2026-08-25, and it moved to the navigation bar, between
        Table and Cameras. `popovertarget` is the whole of the wiring for this button: the browser
@@ -457,7 +466,7 @@
   <div class="docbody">
   <!-- The mark doubles as the dialog's heading: the mark and the two-line wordmark are the logo,
        and "About" over the top of them would be a title for a title. -->
-  <h2 class="logo"><i class="i i-flood"></i><span>Klang Valley<br><b>Flood Watch</b></span></h2>
+  <h2 class="logo"><i class="i i-flood"></i><span class="lk-word">Flood Watch</span><span class="lk-desc">Klang Valley</span></h2>
 
   <p>A live map of flood telemetry for Selangor, Kuala Lumpur and Putrajaya. It draws water levels,
      rainfall, warning sirens and flood gauges, from every station the Department of Irrigation and

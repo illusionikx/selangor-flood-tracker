@@ -253,35 +253,49 @@ function groupCard(items, kind, t, hereAt) {
 const secKey = s => `s:${tier(s)}|${s.kind}`;
 
 /* The tab mark, at the top rung only. A favicon is 16 pixels of one shape, so it can carry a state
-   or a count but never both, and the count is already on the title in front of it. Red or the plain
-   blue mark — nothing in between, because the middle rungs are exactly the ones 16 pixels cannot
-   tell apart.
+   or a count but never both, and the count is already on the title in front of it. Red tile or the
+   plain volt tile. Nothing in between, because the middle rungs are exactly the ones 16 pixels
+   cannot tell apart.
    Painted rather than shipped as a second PNG: `icon.svg` is the one drawing every other mark is
    baked from (see icon-build.php), and a hand-kept red copy is a file that goes stale the next time
-   the glyph moves. `source-in` fills the alpha the glyph left behind — the same trick css/icons.css
-   plays with a mask, and the reason the colour can come from `--s-danger` rather than a hex.
+   the glyph moves. The red state is a rounded `--s-danger` tile with the white glyph, so it still
+   reads as our icon in a tab strip full of tiles. The glyph is drawn white with `source-in`, over
+   the tile, at the same scale and radius that icon-build.php uses. `icon.svg` must stay a bare
+   glyph: a tile inside it comes out as a solid red square here.
    Only repaints when the state flips: this runs on every poll. */
 const FAV = document.querySelector('link[rel=icon]');
-const FAV_SRC = FAV.getAttribute('href');   // the blue mark, to go back to
+const FAV_SRC = FAV.getAttribute('href');   // the volt tile, to go back to
+const FAV_TYPE = FAV.type;                  // its type is SVG, and a data URL below is PNG
 let favRed = false;
+const TILE_SCALE = 0.8, TILE_RADIUS = 0.2237;   // the same two numbers as icon-build.php
 const favicon = red => {
   if (red === favRed) return;
   favRed = red;
-  if (!red) return void (FAV.href = FAV_SRC);
+  if (!red) return void (FAV.type = FAV_TYPE, FAV.href = FAV_SRC);
   const im = new Image();
   im.src = 'icon.svg';
   im.decode().then(() => {
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = 64;
+    const S = 64, cv = document.createElement('canvas');
+    cv.width = cv.height = S;
     const x = cv.getContext('2d');
-    x.drawImage(im, 0, 0, 64, 64);
-    x.globalCompositeOperation = 'source-in';
-    // The token, not a hex — the palette lives in base.css and has moved four times. It is read at
+    // The token, not a hex. The palette lives in base.css and has moved four times. It is read at
     // paint time, so a theme flip while red keeps the old red until the next flip. Both are red.
     x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--s-danger').trim();
-    x.fillRect(0, 0, 64, 64);
-    if (favRed) FAV.href = cv.toDataURL();   // the state may have cleared while the SVG decoded
-  }).catch(() => {});                        // no drawing, no repaint — the blue mark stands
+    x.beginPath();
+    x.roundRect(0, 0, S, S, S * TILE_RADIUS);
+    x.fill();
+    // The glyph goes on a layer of its own, because `source-in` would also keep the tile's alpha.
+    const g = document.createElement('canvas');
+    g.width = g.height = S;
+    const gx = g.getContext('2d');
+    const d = S * TILE_SCALE, o = (S - d) / 2;
+    gx.drawImage(im, o, o, d, d);
+    gx.globalCompositeOperation = 'source-in';
+    gx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--brand-paper').trim();
+    gx.fillRect(0, 0, S, S);
+    x.drawImage(g, 0, 0);
+    if (favRed) { FAV.type = 'image/png'; FAV.href = cv.toDataURL(); }   // the state may have cleared while the SVG decoded
+  }).catch(() => {});                        // no drawing, no repaint. The volt tile stands
 };
 
 /* Two kinds of regional notice, and they do not take the same rank.

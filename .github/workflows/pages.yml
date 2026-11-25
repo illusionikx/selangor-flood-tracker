@@ -89,7 +89,7 @@ jobs:
       # `--base` is the path Pages serves the app under. A view address such as `/<repo>/station/x`
       # needs it in the `<base>` tag, and the build copies `index.html` to `404.html` for those paths.
       - name: Build the site
-        run: npm run build:static -- --base=/${{ github.event.repository.name }}/
+        run: npm run build:static -- --base=/${{ github.event.repository.name }}/ --origin=https://${{ github.repository_owner }}.github.io
 
       # Pages serves no dotfile by default, and Jekyll would otherwise try to process the output.
       - run: touch site/.nojekyll

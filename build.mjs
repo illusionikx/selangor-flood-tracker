@@ -39,12 +39,17 @@ const OUT = 'site';
    that serves the app under a path needs that tag to say so. GitHub Pages serves it under `/<repo>/`.
    The render checks read the build at `/site/`. `npm run build:check` passes that. */
 const BASE = process.argv.find(a => a.startsWith('--base='))?.slice(7) || '/';
+/* **The origin, empty by default.** A link preview needs an absolute `og:image` URL, and a relative
+   one is ignored. Only the Pages bake knows its public host, so it passes `--origin=`. The server
+   build and the render checks leave it out, and `og:image` then stays relative. */
+const ORIGIN = process.argv.find(a => a.startsWith('--origin='))?.slice(9) || '';
 
 /* Fail loudly, and never write a half-built site. Every rewrite below asserts that it matched
    something. A silent no-match is the failure mode this whole file exists to remove, so it must not
    be the failure mode of the file itself. */
 const need = (ok, msg) => { if (!ok) { console.error(`build: ${msg}`); process.exit(1); } };
 need(/^\/(?:[\w.~-]+\/)*$/.test(BASE), `--base must start and end with a slash, got "${BASE}"`);
+need(!ORIGIN || /^https:\/\/[\w.-]+$/.test(ORIGIN), `--origin must be an https origin with no path, got "${ORIGIN}"`);
 
 /* **This deletes `site/`, and the server build puts `api.php` in there.** `api.php` writes its state
    into its own directory: `.history.db`, `.cache.json`, `shots/` and the two logs. So a build run
@@ -169,7 +174,8 @@ for (const f of files(path.join(OUT, 'vendor'))) {
   fs.writeFileSync(f, out.code);
 }
 for (const f of ['manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png',
-                 'border.json']) copy(f);
+                 'icon-maskable-192.png', 'icon-maskable-512.png', 'favicon.svg', 'favicon.ico',
+                 'badge-96.png', 'icon.svg', 'og-image.png', 'border.json']) copy(f);
 /* Optional, for the reason pages.yml already states: a missing decoration must never stop the map
    from updating. */
 for (const f of ['img', 'api.json', 'wx.json']) copy(f, true);
@@ -208,6 +214,8 @@ for (const n of cssFiles)
        `href="${rel(cssOut[n])}"`, `the ${n}.css link`);
 swap(/src="js\/app\.js"/, `src="${rel(entry)}"`, 'the app.js script tag');
 swap(/<base href="\/">/, `<base href="${BASE}">`, 'the base tag');
+if (ORIGIN) swap(/(<meta property="og:image" content=")og-image\.png"/, `$1${ORIGIN}${BASE}og-image.png"`,
+                 'the og:image tag');
 /* GitHub Pages runs no PHP and serves the baked `api.json`. The preload has to name the file that
    js/config.js fetches on that target, or the browser fetches the payload twice. */
 if (STATIC) swap(/<link rel="preload" href="api\.php"/, '<link rel="preload" href="api.json"',
@@ -218,6 +226,12 @@ if (STATIC) swap(/<link rel="preload" href="api\.php"/, '<link rel="preload" hre
    under a key no request ever matched. Read here, the `?v=` in vendor/fonts.css cannot drift from it. */
 const font = fs.readFileSync('vendor/fonts.css', 'utf8').match(/url\((roboto\.woff2[^)]*)\)/)?.[1];
 need(font, 'vendor/fonts.css: no roboto.woff2 url.');
+/* The two brand faces are on the splash, so both join the shell. */
+const brandFonts = ['archivo-expanded', 'jetbrains-mono'].map(n => {
+  const u = fs.readFileSync('vendor/fonts.css', 'utf8').match(new RegExp(`url\\((${n}\\.woff2[^)]*)\\)`))?.[1];
+  need(u, `vendor/fonts.css: no ${n}.woff2 url.`);
+  return `vendor/${u}`;
+});
 
 /* Drop the markup comments. They are 51% of this file, and 15 KB of every cold load compressed.
    A plain regular expression is enough here and is not enough in general: an HTML comment cannot
@@ -254,7 +268,8 @@ if (STATIC) fs.writeFileSync(path.join(OUT, '404.html'), html);
 const buildId = path.basename(entry, '.js').split('-').pop();
 const shell = ['./', ...eager.map(rel), ...cssFiles.map(n => rel(cssOut[n])),
                'vendor/leaflet.js', 'vendor/leaflet-heat.js', 'vendor/leaflet.css',
-               'vendor/fonts.css?v=52', 'vendor/m3/tokens.css?v=2', `vendor/${font}`];
+               'vendor/fonts.css?v=53', 'vendor/m3/tokens.css?v=2', `vendor/${font}`,
+               ...brandFonts];
 
 let sw = fs.readFileSync('sw.js', 'utf8');
 const swap2 = (re, to, what) => {

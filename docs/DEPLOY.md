@@ -302,7 +302,7 @@ server {
     # to reach every reader, and long enough that a reload does not ask again. Without a rule a
     # browser guesses its own lifetime. `sw.js` is left out on purpose: a browser checks a worker on
     # its own schedule, and a day of cache on top of that delays a deploy.
-    location ~* ^/(border\.json|manifest\.json|icon-\d+\.png|img/) {
+    location ~* ^/(border\.json|manifest\.json|favicon\.(svg|ico)|badge-\d+\.png|icon-(maskable-)?\d+\.png|og-image\.png|img/) {
         expires 1d; add_header Cache-Control "public";
         include snippets/flood-headers.conf;
     }

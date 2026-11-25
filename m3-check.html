@@ -1171,9 +1171,18 @@ async function desktop() {
        **Assert the property, never the 36 and the 24.** A rail at another padding, or an icon at
        another size, still has to draw one column. A pair of literals here passes a rail that moved
        every glyph together and fails one that moved none. */
+    /* **A glyph on a tile is measured by its tile.** On the dark theme the brand mark draws as the
+       app icon does: a 24px `--accent-fill` square with the glyph at 0.8 inside it (MIGRATION.md
+       Phase 1c). The tile is what stands on the column, so its box replaces the glyph's. A tile is a
+       parent `.mark` with a painted background. On the light theme the background is transparent and
+       the glyph is measured as before. */
+    const tileOf = i => {
+      const m = i.closest('#brand .mark');
+      return m && cs(m).backgroundColor !== 'rgba(0, 0, 0, 0)' ? m : i;
+    };
     const oneColumn = label => {
       const g = [...railEl.querySelectorAll('.i')]
-        .filter(i => i.getClientRects().length).map(i => i.getBoundingClientRect());
+        .filter(i => i.getClientRects().length).map(i => tileOf(i).getBoundingClientRect());
       is(g.length >= 5, true, label + ': there are glyphs to measure, or the two below prove nothing');
       is(new Set(g.map(b => Math.round(b.left))).size, 1,
          label + ': every glyph stands on one leading edge');
@@ -1301,6 +1310,33 @@ async function desktop() {
          'the glyph names the shade ON SCREEN, which is the one thing Auto hides');
       is(themeBtn.getAttribute('aria-label').endsWith('Switch to ' + other + '.'), true,
          'and its words name the act, so the glyph and the label say two different things');
+      /* **Fill and ink are two tokens (MIGRATION.md Phase 1c).** A filled shape takes
+         `--accent-fill` with `--on-accent-fill` on it, and ink keeps `--accent`. On the dark theme
+         the two differ, and a fill that slid back onto the pale ink is the fault this guards. Each
+         colour is read through a probe painted with the token, never compared with a hex. */
+      const tok = v => {
+        const p = d.createElement('span');
+        p.style.background = `var(${v})`;
+        d.body.appendChild(p);
+        const c = cs(p).backgroundColor;
+        p.remove();
+        return c;
+      };
+      const fab = d.getElementById('railFind');
+      is(cs(fab).backgroundColor, tok('--accent-fill'), `${now}: the search FAB fills with --accent-fill`);
+      is(cs(fab).color, tok('--on-accent-fill'), `${now}: and its glyph takes --on-accent-fill`);
+      const brandMark = d.querySelector('#brand .mark');
+      if (now === 'dark') {
+        is(tok('--accent-fill') !== tok('--accent'), true,
+           'dark: the fill is not the pale ink, so a filled control keeps the brand');
+        is(cs(brandMark).backgroundColor, tok('--accent-fill'),
+           'dark: the brand mark draws as the tile, an --accent-fill square');
+        is(cs(d.querySelector('#brand .brand')).color, tok('--on-accent-fill'),
+           'dark: with the white glyph on it');
+      } else {
+        is(tok('--accent-fill'), tok('--accent'), 'light: the fill and the ink are both volt');
+        is(cs(brandMark).backgroundColor, 'rgba(0, 0, 0, 0)', 'light: the brand mark is the bare glyph');
+      }
       themeBtn.click();
       await settled();
       is(root.dataset.theme, other, 'one press flips the theme, with no box in between');
@@ -2061,7 +2097,7 @@ async function desktop() {
     is(d.getElementById('settingsTitle').textContent, 'Settings', 'settings: under its own title');
     main.querySelector('[data-page="setFav"]').click();
     list.innerHTML = `<li>
-        <i class="glyph i i-water_drop" style="color:#1a73e8"></i>
+        <i class="glyph i i-water_drop" style="color:var(--accent)"></i>
         <span class="nm">SUNGAI DAMANSARA DI TTDI JAYA<br
           ><span class="muted">Shah Alam, Selangor · Water level</span></span>
         <button class="mtrail" data-unfav="probe" data-tip="Remove"
@@ -2128,9 +2164,10 @@ async function desktop() {
     /* **M3's switch.** Track 52x32 with a 2px border, thumb 16px off and 24px on, in a 48x68 target.
        The amber `.testtog` pill is gone. */
     const sw = dev.querySelector('.msw'), track = sw.querySelector('.mswtrack');
-    // A live element already painted in `--accent`, so the check reads the token rather than a hex.
+    // A probe painted with the fill token, so the check reads the token rather than a hex. The track
+    // is a FILL, so it takes `--accent-fill` and not the ink `--accent` (MIGRATION.md Phase 1c).
     const sh0 = d.createElement('span');
-    sh0.style.color = 'var(--md-sys-color-primary)';
+    sh0.style.color = 'var(--accent-fill)';
     sb.appendChild(sh0);
     const thumb = sw.querySelector('.mswthumb'), box = d.getElementById('testMode');
     is([Math.round(r(sw).width), Math.round(r(sw).height)].join(','), '68,48',
@@ -2144,7 +2181,7 @@ async function desktop() {
     await settled();
     is(Math.round(r(thumb).width), 24, 'developer: the handle grows to M3’s 24dp when it is on');
     is(cs(track).backgroundColor, cs(sh0).color,
-       'developer: and the track fills with primary, which is this app’s accent');
+       'developer: and the track fills with --accent-fill, the fill half of the accent');
     box.checked = false;
     sh0.remove();
     await settled();
