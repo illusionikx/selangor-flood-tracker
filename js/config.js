@@ -333,6 +333,23 @@ export const RAIN_FLOOR = 0.125;   // the wash floor, shared by both layers
    function that scores a station. */
 export const WATER_INTERP_KM = 10;
 export const WATER_PRIOR_KM  = 6;
+
+/* **A STATION HOLDS ITS OWN VALUE OUT TO A CORE, AND THE OWNER DECIDED THAT ON 2026-11-25.** Both
+   layers take it. Inside `WATER_CORE_KM` or `RAIN_CORE_KM` of a station, the distance that weakens
+   its claim counts as zero. Past the core the hill or the weight falls as before, from the core
+   edge. The end of the reach does not move, because the edge fade still keys on the plain distance.
+   **Why.** A lone hill used to fall from its own spot, so a flooded gauge painted its own class over
+   2.5 km and every ring past that in a class no sensor reported. In a cluster, the put-back cut a
+   pale ring round each station. The owner read both in `heat-levels.html` and chose a flat top.
+   **Why 2.5 km.** It is the radius a flooded gauge's top class already covered. So one station paints
+   no more ground at its top class than it did, and the gain is in the shape.
+   **Rain applies the core to a dry gauge too.** A core on wet gauges alone let rain run over dry
+   gauges nearby, and a reading of zero is evidence the same as any other. Measured in the preview.
+   `HEAT_BLUR_KM` is the blur of both fields, in km. It was 0.05 of each reach (0.5 km for water,
+   0.6 km for rain), which left a step wherever one station's influence started or stopped. */
+export const WATER_CORE_KM = 2.5;
+export const RAIN_CORE_KM  = 2.5;
+export const HEAT_BLUR_KM  = 1;
 export const WATER_ALERT_V   = 0.25;
 export const WATER_WARNING_V = 0.625;
 export const WATER_DANGER_V  = 1;

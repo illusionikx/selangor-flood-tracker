@@ -11,7 +11,8 @@
           gauge draws a hill, a dry gauge counts as zero, and the wash ends at the cover limit.
        3. The water layer takes the HIGHEST hill of the stations near a point. A station keeps its own
           class, a calm station draws nothing and lowers nothing, two stations never add up, and
-          water on the ground has a class above danger.
+          water on the ground has a class above danger. A station holds its value across its flat
+          core, and a far flooded gauge cannot lift a danger station to its class.
        4. A stale reading feeds nothing. The Settings opacity stops at 80%.
 
      Run it headless. It prints its own verdict into the output box below, so there is nothing to
@@ -149,10 +150,17 @@ try {
   const wpaint = list => { heat.setLatLngs(list); heat._redraw(); };
   const DANGER = WATER_CLASSES.length - 2, GROUND = WATER_CLASSES.length - 1;
 
-  // A lone station at its alert mark colours 5 km: the reach it had as a disc.
+  // A lone station at its alert mark colours about 6.8 km since the 2.5 km core of 2026-11-25. Its
+  // hill falls from the core edge and the edge fade from 5 km ends it.
   wpaint([[...WET, 0.25]]);
-  ok('a station at alert colours 4 km, not 6 km', pixAt(heat, east(4)).a > 0 && pixAt(heat, east(6)).a === 0,
-     'alpha ' + pixAt(heat, east(4)).a + ' at 4 km, ' + pixAt(heat, east(6)).a + ' at 6 km');
+  ok('a station at alert colours 6 km, not 7.5 km', pixAt(heat, east(6)).a > 0 && pixAt(heat, east(7.5)).a === 0,
+     'alpha ' + pixAt(heat, east(6)).a + ' at 6 km, ' + pixAt(heat, east(7.5)).a + ' at 7.5 km');
+
+  /* **The flat core.** A station holds its own value out to WATER_CORE_KM. A flooded gauge keeps
+     the top class at 3 km. Without the core its hill fell to danger by 2.5 km. */
+  wpaint([[...WET, 1.25]]);
+  ok('a flooded gauge holds its class across its core', wcls(east(2)) === WATER_CLASSES.length - 1 && wcls(east(3)) === WATER_CLASSES.length - 1,
+     'bands ' + wcls(east(2)) + ' and ' + wcls(east(3)) + ' at 2 and 3 km');
 
   // A lone station at danger draws a hill: the class falls with distance, and the wash ends at 10 km.
   wpaint([[...WET, 1]]);
@@ -179,6 +187,18 @@ try {
   wpaint([[...WET, 0.3], [...east(1), 1]]);
   ok('a low station beside a high one is not lowered', wcls(east(1)) === DANGER && wcls(WET) >= classOf(0.3, WATER_CLASSES),
      'bands ' + wcls(WET) + ' and ' + wcls(east(1)));
+
+  /* **The soft cap.** Three danger stations 1 km apart, with a flooded gauge 8 km away. The blend of
+     the three goes past 1. Under the old hard cap the flooded gauge set the cap to 1.25 anywhere in
+     its 10 km reach, and the three painted as water on the ground. The cap fades with the gauge's own
+     edge now, so they stay at danger. */
+  {
+    const atkm = (dx, dy) => [WET[0] + dy / 111, WET[1] + dx / (111 * Math.cos(WET[0] * Math.PI / 180))];
+    wpaint([[...WET, 1.25], [...atkm(8, 0), 1], [...atkm(8, 1), 1], [...atkm(8, -1), 1]]);
+    ok('danger stations near a flooded gauge stay at danger', wcls(atkm(8, 0)) === DANGER && wcls(atkm(8.5, 0.5)) === DANGER,
+       'bands ' + wcls(atkm(8, 0)) + ' and ' + wcls(atkm(8.5, 0.5)) + ', wanted ' + DANGER);
+    ok('and the flooded gauge keeps its own class   ', wcls(WET) === GROUND, 'band ' + wcls(WET));
+  }
 
   // The usual day: no station past its alert mark. Nothing paints and nothing throws.
   wpaint([]);
@@ -269,6 +289,13 @@ try {
   paint([[...WET, 0.9], [...east(0.05), 0.3]]);
   ok('two gauges 50 m apart leave no hole      ', [WET, east(0.025), east(0.05)].every(ll => rpix(ll).a === 255),
      'alphas ' + [WET, east(0.025), east(0.05)].map(ll => rpix(ll).a).join(' '));
+
+  /* **The rain core covers a dry gauge too.** A wet gauge 3 km from a dry one keeps its own class at
+     its own spot, and the dry gauge's spot stays bare. Without a core on the dry gauge, the wet one's
+     core weight would carry rain over it. */
+  paint([[...WET, 0.9]], [east(3)]);
+  ok('the rain core does not carry rain over a dry gauge', rpix(east(3)).a === 0 && rcls(WET) === classOf(0.9, RAIN_CLASSES),
+     'alpha ' + rpix(east(3)).a + ' at the dry gauge, class ' + rcls(WET) + ' at the wet one');
 
   // All gauges dry: nothing paints, and nothing throws.
   paint([], [WET, east(2)]);

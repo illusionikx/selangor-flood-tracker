@@ -21381,3 +21381,25 @@ The app now wears the Flood Watch identity from `branding/`. The rule is calm UI
 
 **Not built in R1.** Bold buttons (R2), readings in JetBrains Mono (R2) and the vivid sensor kind colors (R3). No brand color is on the map. Roboto stays the UI face.
 
+## A station holds its own value across a flat core, and the water cap fades (2026-11-25)
+
+**Why.** The owner read the water wash in side view and found two faults. First, a hill fell from the station's own spot. So a flooded gauge painted its own class over 2.5 km, and every ring past that in a class that no sensor reported. Second, the side view through a cluster was a staircase. The owner asked for a flat top with a smooth edge.
+
+**What changed.**
+- Both layers take a flat core of 2.5 km (`WATER_CORE_KM`, `RAIN_CORE_KM` in `js/config.js`). Inside it a station's distance counts as zero. Past it the water hill and the rain weight fall from the core edge. The end of the reach does not move, because the edge fade still keys on the plain distance.
+- The water cap fades with each station's own edge fade. The cap is the ceiling of the blend. It took a station's full value anywhere inside its 10 km reach, so it jumped where a station left reach. In the test storm, one flooded gauge (1.25) set the cap for about twenty danger stations (1.0). Their blend reached that cap, and the map painted them all as water on the ground. That broke the owner's rule that a reading keeps its colour where it was measured. See the gotcha.
+- Both fields blur at 1 km (`HEAT_BLUR_KM`). It was 0.05 of each reach, which is 0.5 km on water and 0.6 km on rain. A sharper blur left a step wherever one station's influence started or stopped.
+- Rain gives the core to a dry gauge too. In the preview, a core on wet gauges alone let rain run over the dry gauges round them. A reading of zero is evidence the same as any other.
+- `heat-levels.html` is new. It draws one station or the test mode stations, and it shows the wash in side view: distance from the station across, value up, with the painted pixels in a strip under it. It also previews other shapes (flat core, dome core, whole reach) and the two cap rules before any of them goes into `js/heat.js`. `heat-tune.html` gains a "Flat core" slider on both layers.
+
+**Why 2.5 km.** The owner chose it in the preview. It is the radius a flooded gauge's top class covered before. So one station paints no more ground at its top class than it did. The gain is in the shape, and in a cluster the top class covers less ground than before, because of the cap.
+
+**Alert design standard.** The change paints no new class and adds no alert surface. One station claims the same ground at its top class as before. A cluster near one flooded gauge claims less: danger readings stay danger. So the cry-wolf risk goes down. A station at its alert mark now colours about 6.8 km, against 6 km. That is the one place the wash grows, and it is the lowest class.
+
+**Trade-offs accepted.**
+- The outer fall is shorter. The hill now falls from 2.5 km to its end inside the same reach. So the warning and alert rings are narrower on a lone station.
+- Two gauges closer than 5 km share their cores. Between them, each one's weight is whole, so the wash there is their plain average.
+- The small plateau round each station stays. The put-back pulls the field to the station's own reading within 1.5 grid cells. Where the blend round a station is above its own reading, that draws a small pale shape on the map. It was there before this change. It carries the owner's rule of 2026-11-23, so it stays until the owner decides otherwise.
+
+**Not built.** The dome core and the whole-reach disc stay in the preview only. The owner judged the dome invisible on the map, because the top band covers only the top 10% of the value.
+

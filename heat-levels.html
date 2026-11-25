@@ -1,0 +1,467 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heat levels</title>
+<!-- **Not a check and not part of the app.** A page for a person to read a heat wash in side view, at
+     each alert level, for one station or for the test mode stations. Open
+     https://flood-exp.test/heat-levels.html.
+     "Current" is the app's own js/heat.js, and the strip under the side view holds the pixels it
+     painted. The other modes are previews that this page computes itself: the same combine rules,
+     but without the put-back and in 4 px cells. Use them to try a shape before it goes into
+     js/heat.js. The basemap is fake.
+     The address takes `src=test`, `layer=rain`, `mode=`, `step=`, `core=`, `soft=0`, `blur=` and
+     `drycore=0`, so a screenshot can open on one setting. -->
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+  :root { --bg: #fff; --fg: #1b1f24; --mute: #5f6b76; --line: #e3e7eb; --field: #f4f6f8; }
+  :root[data-theme="dark"] { --bg: #1c2127; --fg: #e8ecef; --mute: #98a3ad; --line: #2f363e; --field: #262c33; }
+  html, body { margin: 0; height: 100%; font: 14px/1.4 system-ui, sans-serif; }
+  /* The map and the panel sit side by side, so the panel never covers the map. Below 1100px the
+     panel goes under the map. */
+  body { background: var(--bg); }
+  #map { position: fixed; left: 0; top: 0; bottom: 0; right: 640px; }
+  #ctl { position: fixed; right: 0; top: 0; bottom: 0; width: 640px; overflow: auto; box-sizing: border-box;
+         background: var(--bg); color: var(--fg); border-left: 1px solid var(--line);
+         padding: 12px 16px; display: grid; gap: 10px; align-content: start; }
+  @media (max-width: 1100px) {
+    #map { right: 0; bottom: 45%; }
+    #ctl { left: 0; top: 55%; width: auto; border-left: 0; border-top: 1px solid var(--line); }
+  }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .seg { display: flex; background: var(--field); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: none; color: var(--fg); font: inherit; padding: 6px 12px; border-radius: 7px; cursor: pointer; }
+  .seg button.on { background: var(--bg); box-shadow: 0 1px 3px #0003; font-weight: 600; }
+  .seg button[hidden] { display: none; }
+  button.b, select { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--fg);
+             padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+  #name { font-size: 18px; font-weight: 600; }
+  #sub, #step { color: var(--mute); font-variant-numeric: tabular-nums; }
+  #sw { display: flex; gap: 2px; }
+  #sw span { flex: 1; height: 14px; border-radius: 3px; outline-offset: 1px; }
+  #sw span.cur { outline: 2px solid var(--fg); }
+  label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+  #prof { width: 100%; height: 220px; display: block; }
+  .note { color: var(--mute); font-size: 12px; }
+</style>
+<div id="map"></div>
+<button id="sideClose" hidden></button>
+<dialog id="pane"></dialog>
+<div id="ctl">
+  <div class="row">
+    <select id="src"><option value="single">One station</option><option value="test">Test mode stations</option></select>
+    <div class="seg" id="layerSeg"><button data-v="water" class="on">Water level</button><button data-v="rain">Rainfall</button></div>
+    <label><input type="checkbox" id="dark"> Dark</label>
+    <label><input type="checkbox" id="play"> Auto play</label>
+    <span id="step" style="margin-left:auto"></span>
+  </div>
+  <div class="row">
+    <div class="seg" id="modeSeg"><button data-v="current" class="on">Current</button><button data-v="core">Flat core</button><button data-v="dome">Dome core</button><button data-v="disc">Whole reach</button></div>
+  </div>
+  <div class="row">
+    <label id="coreLbl">Core <input type="range" id="core" min="0" max="8" step="0.5"> <span id="coreV"></span></label>
+    <label id="droopLbl">Droop <input type="range" id="droop" min="0" max="0.5" step="0.01"> <span id="droopV"></span></label>
+    <label id="softLbl" title="Each station's cap fades with its own hill edge, so the cap does not jump at the end of the reach"><input type="checkbox" id="soft"> Soft cap</label>
+    <label id="dryLbl" title="A gauge reading zero gets the same core as a wet one"><input type="checkbox" id="dryCore"> Dry gauges get the core</label>
+    <label id="blurLbl">Blur <input type="range" id="blur" min="0" max="3" step="0.1"> <span id="blurV"></span></label>
+  </div>
+  <div class="row">
+    <button class="b" id="prev">◀</button>
+    <div style="flex:1"><div id="name"></div><div id="sub"></div></div>
+    <button class="b" id="next">▶</button>
+  </div>
+  <div id="sw"></div>
+  <canvas id="prof"></canvas>
+  <div class="note" id="note"></div>
+</div>
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet-heat.js"></script>
+<script type="module">
+const $ = id => document.getElementById(id);
+const { map } = await import('./js/map.js');
+const { heat, rainHeat, heatOpacity, classOf, classesFor, smoothGrid, HEAT_OPACITY_TOP } = await import('./js/heat.js');
+const { RAIN_STOPS, FEED, WATER_ALERT_V, WATER_WARNING_V, WATER_DANGER_V, WATER_GROUND_V } = await import('./js/config.js');
+const { scalePos, waterValue, heatOk, doubted } = await import('./js/util.js');
+const { seedTest } = await import('./js/test.js');
+
+// The shipped stepped look, the same set heat-tune.html starts from.
+for (const l of [heat, rainHeat]) { l.options.opacity = HEAT_OPACITY_TOP; l.options.opacityMin = l.options.minDefault; l.options.stepped = true; }
+
+const AT = [3.14, 101.69];
+const mid = (a, b) => (a + b) / 2;
+const rainV = mm => scalePos(mm, RAIN_STOPS) / 100;
+// A step is [name, detail, value on the layer's own scale].
+const STEPS = {
+  water: [
+    ['Below alert', 'Under the first mark. Draws nothing.', 0],
+    ['Alert', 'At the alert mark', WATER_ALERT_V],
+    ['Alert to warning', 'Halfway', mid(WATER_ALERT_V, WATER_WARNING_V)],
+    ['Warning', 'At the warning mark', WATER_WARNING_V],
+    ['Warning to danger', 'Halfway', mid(WATER_WARNING_V, WATER_DANGER_V)],
+    ['Danger', 'At the danger mark', WATER_DANGER_V],
+    ['Water on the ground', 'Flood gauge past its warning mark', WATER_GROUND_V],
+  ],
+  rain: [
+    ['Dry', '0 mm/h. Draws nothing.', 0],
+    ['Light', '1 mm/h', rainV(1)],
+    ['Light', '5 mm/h', rainV(5)],
+    ['Moderate', '10.1 mm/h', rainV(10.1)],
+    ['Moderate', '20 mm/h', rainV(20)],
+    ['Heavy', '30.1 mm/h', rainV(30.1)],
+    ['Heavy', '45 mm/h', rainV(45)],
+    ['Very heavy', '61 mm/h', rainV(61)],
+    ['Very heavy', '100 mm/h', rainV(100)],
+  ],
+};
+const LAYER = { water: heat, rain: rainHeat };
+const MARKS = {
+  water: [['alert', WATER_ALERT_V], ['warning', WATER_WARNING_V], ['danger', WATER_DANGER_V], ['ground', WATER_GROUND_V]],
+  rain: [['light', 0.25], ['moderate', 0.5], ['heavy', 0.75], ['very heavy', 1]],
+};
+// The preview modes each layer offers. Rain has no dome and no disc: a mean has no peak to shape.
+const MODES = { water: ['current', 'core', 'dome', 'disc'], rain: ['current', 'core'] };
+
+/* The preview settings, one set per layer, starting on the shipped options where the layer has
+   them. `soft` is water only: rain takes a mean, and a mean has no cap. `dryCore` is rain only. */
+const SET = {};
+for (const [n, l] of Object.entries(LAYER))
+  SET[n] = { mode: 'current', core: l.options.coreKm ?? 2.5, droop: 0.15, soft: true, dryCore: true,
+             blur: +(l.options.sigma * l.options.interpKm).toFixed(1) };
+let src = 'single', active = 'water', idx = 1, timer = null;
+const S = () => SET[active];
+let test = null;     // test mode: { water: [...], rain: [...], dry: [...] }, wet lists highest first
+let pts = [], dry = [], sel = 0;
+let grid = null;     // the last preview field: {V, cw, ch, S, M}, which the side view samples
+const variant = () => S().mode !== 'current';
+
+/* ---- The field ---- */
+function kmPx(km) {
+  const c = L.latLng(AT), e = L.latLng(AT[0], AT[1] + km / (111 * Math.cos(AT[0] * Math.PI / 180)));
+  return Math.abs(map.latLngToLayerPoint(e).x - map.latLngToLayerPoint(c).x);
+}
+const ramp = (t, k) => { const u = (t - k) / (1 - k); return 1 - u * u * (3 - 2 * u); };
+
+/* The numbers one paint needs. Water is the hill in `_interp()` or a preview shape. Rain is the
+   weight of one gauge in the mean, with its core when the mode has one. */
+function makeShape(o) {
+  const st = S(), m = st.mode;
+  const R = Math.max(10, kmPx(o.groundKm)), kmpx = R / o.interpKm, D0 = o.priorKm * kmpx, HP = o.hillPow ?? 2;
+  const P = o.power ?? 2, w0 = 1 / Math.pow(D0, P), covpx = (o.coverKm || 0) * kmpx;
+  const C = m === 'current' ? (o.coreKm ?? 0) * kmpx : st.core * kmpx;
+  const hill = x => 1 / (1 + Math.pow(x / D0, HP));
+  const taper = d => { const t = d / R; return t >= 1 ? 0 : t > 0.5 ? ramp(t, 0.5) : 1; };
+  /* `dome`: inside the core a parabola that falls by `droop` at the core edge. Past it the same
+     hill, entered where the hill falls at the parabola's rate, so the curve has no corner. */
+  let x0 = 0;
+  const dome = m === 'dome' && C > 0 && st.droop > 0, fC = 1 - st.droop;
+  if (dome) {
+    const want = 2 * st.droop / (C * fC);
+    const rel = x => HP / D0 * Math.pow(x / D0, HP - 1) / (1 + Math.pow(x / D0, HP));
+    let a = 0, b = D0 * Math.pow(HP - 1, 1 / HP);
+    for (let i = 0; i < 40; i++) { const h = (a + b) / 2; rel(h) < want ? a = h : b = h; }
+    x0 = (a + b) / 2;
+  }
+  const hillAt = (d, v) => {
+    const tp = taper(d);
+    if (!tp) return 0;
+    if (m === 'disc') return v;
+    if (dome) return v * tp * (d <= C ? 1 - st.droop * (d / C) ** 2 : fC * hill(d - C + x0) / hill(x0));
+    return v * tp * hill(Math.max(0, d - C));
+  };
+  // The shipped layer has the soft cap on water and the core on dry gauges, since 2026-11-25.
+  const soft = m === 'current' ? true : st.soft;
+  const capAt = (d, v) => soft ? v * taper(d) : v;
+  const dryC = m === 'current' ? true : st.dryCore;
+  const weight = (d, isDry) => {
+    const tp = taper(d);
+    if (!tp) return 0;
+    const dd = isDry && !dryC ? d : Math.max(0, d - C);
+    return tp * (isDry ? o.dryWeight ?? 1 : 1) / (Math.pow(dd, P) + 1);
+  };
+  return { R, kmpx, w0, covpx, hillAt, capAt, weight, blend: o.blend ?? 0, floor: o.floor, max: o.combine === 'max' };
+}
+
+/* The combined value at one container point, from the projected wet `P` and dry `Dr` lists. Water:
+   the highest hill, plus `blend` of the others, under the cap. Rain: the weighted mean with the
+   prior, bare past the cover distance from every gauge. No blur and no put-back here. */
+function evalAt(x, y, P, Dr, sh) {
+  if (sh.max) {
+    let best = 0, sum = 0, top = 0;
+    for (const p of P) {
+      const d = Math.hypot(x - p.x, y - p.y);
+      if (d >= sh.R) continue;
+      const h = sh.hillAt(d, p.v), c = sh.capAt(d, p.v);
+      sum += h; if (c > top) top = c; if (h > best) best = h;
+    }
+    return Math.min(top, best + sh.blend * (sum - best));
+  }
+  let sw = 0, swv = 0, dmin = Infinity;
+  for (const [L_, isDry] of [[P, false], [Dr, true]]) for (const p of L_) {
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d < dmin) dmin = d;
+    if (d >= sh.R) continue;
+    const w = sh.weight(d, isDry);
+    sw += w; swv += w * (isDry ? 0 : p.v);
+  }
+  return sh.covpx && dmin > sh.covpx ? 0 : swv / (sw + sh.w0);
+}
+const project = list => list.map(p => {
+  const c = map.latLngToContainerPoint([p.lat, p.lng]); return { x: c.x, y: c.y, v: p.v ?? 0 };
+});
+
+/* ---- The preview overlay: a canvas in the heat pane, painted in 4 px cells ---- */
+const OVM = 200;
+const ov = L.DomUtil.create('canvas', '', map.getPane('heat'));
+ov.style.position = 'absolute';
+function alphaOf(k, cls, o) {
+  const top = o.opacity, lo = o.opacityMin / top, m = cls.length - 1;
+  return top * (lo + (1 - lo) * k / m);
+}
+function drawOverlay() {
+  ov.style.display = variant() ? '' : 'none';
+  if (!variant()) { grid = null; return; }
+  const M = OVM, size = map.getSize().add([2 * M, 2 * M]), CS = 4, cw = Math.ceil(size.x / CS), ch = Math.ceil(size.y / CS);
+  ov.width = size.x; ov.height = size.y;
+  L.DomUtil.setPosition(ov, map.containerPointToLayerPoint([-M, -M]));
+  const l = LAYER[active], o = l.options, cls = classesFor(l), sh = makeShape(o), n = cw * ch;
+  const A = new Float32Array(n), B = new Float32Array(n), T = new Float32Array(n), Dm = new Float32Array(n).fill(Infinity);
+  // Each station adds to the cells within its reach. Water: best, sum and cap. Rain: weight sum, weighted sum, nearest gauge.
+  const each = (list, isDry) => { for (const q of project(list)) {
+    const px = q.x + M, py = q.y + M, reach = sh.max ? sh.R : Math.max(sh.R, sh.covpx);
+    const gx0 = Math.max(0, Math.floor((px - reach) / CS)), gx1 = Math.min(cw - 1, Math.ceil((px + reach) / CS));
+    const gy0 = Math.max(0, Math.floor((py - reach) / CS)), gy1 = Math.min(ch - 1, Math.ceil((py + reach) / CS));
+    for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+      const d = Math.hypot(gx * CS + CS / 2 - px, gy * CS + CS / 2 - py), i = gy * cw + gx;
+      if (!sh.max && d < Dm[i]) Dm[i] = d;
+      if (d >= sh.R) continue;
+      if (sh.max) {
+        const h = sh.hillAt(d, q.v), c = sh.capAt(d, q.v);
+        B[i] += h; if (c > T[i]) T[i] = c; if (h > A[i]) A[i] = h;
+      } else {
+        const w = sh.weight(d, isDry);
+        A[i] += w; B[i] += w * (isDry ? 0 : q.v);
+      }
+    }
+  } };
+  each(pts, false);
+  if (!sh.max) each(dry, true);
+  const V = new Float32Array(n);
+  for (let i = 0; i < n; i++)
+    V[i] = sh.max ? Math.min(T[i], A[i] + sh.blend * (B[i] - A[i]))
+                  : (sh.covpx && Dm[i] > sh.covpx ? 0 : B[i] / (A[i] + sh.w0));
+  // The blur is the shipped `smoothGrid()`, at a sigma of the Blur slider.
+  if (S().blur > 0) smoothGrid(V, cw, ch, S().blur * sh.kmpx / CS);
+  grid = { V, cw, ch, S: CS, M };
+  const g = ov.getContext('2d', { willReadFrequently: true });
+  g.clearRect(0, 0, ov.width, ov.height);
+  for (let i = 0; i < n; i++) {
+    if (!(V[i] > o.floor)) continue;
+    const k = classOf(V[i], cls);
+    g.globalAlpha = alphaOf(k, cls, o); g.fillStyle = cls[k][1];
+    g.fillRect((i % cw) * CS, Math.floor(i / cw) * CS, CS, CS);
+  }
+  g.globalAlpha = 1;
+}
+
+/* ---- The page ---- */
+function syncControls() {
+  const st = S();
+  for (const b of $('modeSeg').children) { b.classList.toggle('on', b.dataset.v === st.mode); b.hidden = !MODES[active].includes(b.dataset.v); }
+  $('core').value = st.core; $('coreV').textContent = `${st.core} km`;
+  $('droop').value = st.droop; $('droopV').textContent = `${Math.round(st.droop * 100)}%`;
+  $('soft').checked = st.soft; $('dryCore').checked = st.dryCore;
+  $('blur').value = st.blur; $('blurV').textContent = `${st.blur} km`;
+  const v = variant();
+  $('coreLbl').style.display = v && st.mode !== 'disc' ? '' : 'none';
+  $('droopLbl').style.display = st.mode === 'dome' ? '' : 'none';
+  $('softLbl').style.display = v && active === 'water' ? '' : 'none';
+  $('dryLbl').style.display = v && active === 'rain' ? '' : 'none';
+  $('blurLbl').style.display = v ? '' : 'none';
+  for (const b of $('layerSeg').children) b.classList.toggle('on', b.dataset.v === active);
+}
+function show() {
+  const l = LAYER[active];
+  let v, name, sub;
+  if (src === 'single') {
+    [name, sub, v] = STEPS[active][idx];
+    pts = [{ lat: AT[0], lng: AT[1], v, name }]; dry = []; sel = 0;
+    $('step').textContent = `${idx + 1} / ${STEPS[active].length}`;
+  } else {
+    pts = test[active]; dry = active === 'rain' ? test.dry : []; sel = idx;
+    const p = pts[sel] ?? { v: 0, name: 'No station' };
+    v = p.v; name = p.name;
+    sub = `${active === 'water' ? 'Station' : 'Wet gauge'} ${sel + 1} of ${pts.length}, highest first`;
+    $('step').textContent = `${pts.length ? sel + 1 : 0} / ${pts.length}`;
+    if (pts[sel]) map.setView([p.lat, p.lng], map.getZoom(), { animate: false });
+  }
+  for (const [n, x] of Object.entries(LAYER)) n === active && !variant() ? x.addTo(map) : x.remove();
+  rainHeat.setDry(active === 'rain' ? dry.map(p => [p.lat, p.lng]) : []);
+  l.setLatLngs(pts.filter(p => p.v > 0).map(p => [p.lat, p.lng, p.v]));
+  heatOpacity();
+  const cls = classesFor(l), k = v > l.options.floor ? classOf(v, cls) : -1;
+  $('name').textContent = name;
+  $('sub').textContent = `${sub} · value ${v.toFixed(3)} · ${k < 0 ? 'no class' : `class ${k} of ${cls.length - 1}, ${cls[k][1]}`}`;
+  $('sw').innerHTML = cls.map((c, i) => `<span style="background:${c[1]}" class="${i === k ? 'cur' : ''}" title="edge ${c[0]}"></span>`).join('');
+  syncControls();
+  $('note').textContent = `Side view on the east-west line through the ${src === 'test' ? 'selected ' : ''}station. ` +
+    (variant() ? 'The curve reads the preview grid, so it carries the blur but not the put-back. The map and the strip are this page\'s preview, not the real layer.'
+               : 'The curve is the formula before the blur and the put-back. The strip holds the pixels the real layer painted on that line.') +
+    (src === 'test' ? ' Press a dot to cut through that station.' : '');
+  drawDots();
+  drawOverlay();
+  requestAnimationFrame(() => requestAnimationFrame(profile));
+}
+
+/* The side view. x is km east of the station, z is the combined field value. */
+function profile() {
+  const cv = $('prof'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const l = LAYER[active], o = l.options, cls = classesFor(l);
+  const css = getComputedStyle(document.documentElement), fg = css.getPropertyValue('--fg'), mute = css.getPropertyValue('--mute');
+  const X = (src === 'test' ? 2 : 1.1) * Math.max(o.interpKm, o.coverKm || 0), zMax = active === 'water' ? 1.4 : 1.1;
+  const L0 = 84, R0 = W - 8, T0 = 8, STRIP = 14, B0 = H - 22 - STRIP - 6;
+  const sx = km => L0 + (km + X) / (2 * X) * (R0 - L0), sz = z => B0 - Math.min(z, zMax) / zMax * (B0 - T0);
+  g.font = '11px system-ui'; g.textBaseline = 'middle';
+  g.strokeStyle = mute; g.fillStyle = mute; g.setLineDash([3, 3]); g.lineWidth = 1;
+  for (const [nm, z] of [['floor', o.floor], ...MARKS[active]]) {
+    g.beginPath(); g.moveTo(L0, sz(z)); g.lineTo(R0, sz(z)); g.stroke();
+    g.fillText(`${nm} ${+z.toFixed(3)}`, 2, sz(z));
+  }
+  g.setLineDash([]);
+  const centre = map.latLngToContainerPoint(pts[sel] ? [pts[sel].lat, pts[sel].lng] : AT);
+  const sh = makeShape(o), P = project(pts.filter(p => p.v > 0)), Dr = project(dry);
+  const fromGrid = (x, y) => {
+    if (!grid) return null;
+    const gx = (x + grid.M) / grid.S - 0.5, gy = (y + grid.M) / grid.S - 0.5;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy), fx = gx - x0, fy = gy - y0;
+    if (x0 < 0 || y0 < 0 || x0 + 1 >= grid.cw || y0 + 1 >= grid.ch) return null;
+    const at = (a, b) => grid.V[b * grid.cw + a];
+    return (at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx) * (1 - fy) + (at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
+  };
+  const N = Math.round(R0 - L0), zs = new Float32Array(N + 1);
+  for (let i = 0; i <= N; i++) {
+    const x = centre.x + (-X + i / N * 2 * X) * sh.kmpx;
+    zs[i] = fromGrid(x, centre.y) ?? evalAt(x, centre.y, P, Dr, sh);
+  }
+  for (let i = 0; i < N; i++) {
+    const z = (zs[i] + zs[i + 1]) / 2;
+    if (z <= 0) continue;
+    g.fillStyle = z > o.floor ? cls[classOf(z, cls)][1] : '#9aa5ad55';
+    g.fillRect(L0 + i, sz(z), 1, B0 - sz(z));
+  }
+  g.strokeStyle = fg; g.lineWidth = 1.5; g.beginPath();
+  for (let i = 0; i <= N; i++) i ? g.lineTo(L0 + i, sz(zs[i])) : g.moveTo(L0, sz(zs[0]));
+  g.stroke();
+  g.strokeStyle = fg; g.lineWidth = 1; g.beginPath(); g.moveTo(L0, B0); g.lineTo(R0, B0); g.stroke();
+  g.fillStyle = mute; g.textAlign = 'center';
+  const tick = X > 15 ? 4 : 2;
+  for (let km = -Math.floor(X / tick) * tick; km <= X; km += tick) {
+    g.fillRect(sx(km), B0, 1, 4);
+    g.fillText(km ? `${km} km` : 'station', sx(km), H - 8);
+  }
+  g.textAlign = 'start';
+  // The strip: the pixels on the same line, off whichever canvas painted the map.
+  const real = !variant(), hc = real ? l._canvas : ov;
+  g.fillStyle = mute; g.fillText(real ? 'painted' : 'preview', 2, B0 + 6 + STRIP / 2);
+  if (!hc || (real && !l._map)) return;
+  const pad = real ? l._pad() : { x: OVM, y: OVM }, op = real ? +hc.style.opacity || 1 : 1;
+  const cx0 = centre.x + pad.x, y = Math.round(centre.y + pad.y);
+  if (y < 0 || y >= hc.height) return;
+  const row = hc.getContext('2d').getImageData(0, y, hc.width, 1).data;
+  for (let i = 0; i < N; i++) {
+    const cx = Math.round(cx0 + (-X + (i + 0.5) / N * 2 * X) * sh.kmpx);
+    if (cx < 0 || cx >= hc.width) continue;
+    const a = row[cx * 4 + 3] / 255 * op;
+    if (!a) continue;
+    g.fillStyle = `rgba(${row[cx * 4]},${row[cx * 4 + 1]},${row[cx * 4 + 2]},${a})`;
+    g.fillRect(L0 + i, B0 + 6, 1, STRIP);
+  }
+}
+
+/* ---- Controls ---- */
+const count = () => src === 'single' ? STEPS[active].length : Math.max(1, test[active].length);
+const go = d => { const n = count(); idx = (idx + d + n) % n; show(); };
+$('prev').onclick = () => go(-1);
+$('next').onclick = () => go(1);
+$('layerSeg').onclick = e => { const v = e.target.dataset.v; if (v && v !== active) { active = v; idx = src === 'single' ? 1 : 0; show(); } };
+$('modeSeg').onclick = e => { const v = e.target.dataset.v; if (v && v !== S().mode) { S().mode = v; show(); } };
+$('core').oninput = e => { S().core = +e.target.value; show(); };
+$('droop').oninput = e => { S().droop = +e.target.value; show(); };
+$('soft').onchange = e => { S().soft = e.target.checked; show(); };
+$('dryCore').onchange = e => { S().dryCore = e.target.checked; show(); };
+$('blur').oninput = e => { S().blur = +e.target.value; show(); };
+$('play').onchange = e => { clearInterval(timer); if (e.target.checked) timer = setInterval(() => go(1), 1800); };
+document.onkeydown = e => { if (e.key === 'ArrowLeft') go(-1); if (e.key === 'ArrowRight') go(1); };
+$('src').onchange = async e => {
+  src = e.target.value; idx = src === 'single' ? 1 : 0;
+  if (src === 'test' && !test) await loadTest();
+  if (src === 'single') map.setView(AT, 11, { animate: false });
+  show();
+};
+
+/* The test mode stations: the live payload with the app's own fake flood seeded over it. The same
+   rules as the app pick what feeds each layer: a water station past its alert mark, and a trusted
+   rain gauge, wet or dry. */
+async function loadTest() {
+  $('name').textContent = 'Loading stations';
+  const j = await (await fetch(FEED)).json();
+  const st = j.stations || [];
+  seedTest(st);
+  const water = [], rain = [], dryG = [];
+  for (const s of st) {
+    const nm = s.name || s.id, wv = waterValue(s);
+    if (wv > 0) water.push({ lat: s.lat, lng: s.lng, v: wv, name: nm });
+    if (s.kind === 'rainfall' && heatOk(s) && !doubted(s))
+      s.hourly > 0 ? rain.push({ lat: s.lat, lng: s.lng, v: rainV(s.hourly), name: `${nm} · ${s.hourly} mm/h` })
+                   : dryG.push({ lat: s.lat, lng: s.lng, v: 0, name: nm });
+  }
+  const by = (a, b) => b.v - a.v;
+  test = { water: water.sort(by), rain: rain.sort(by), dry: dryG };
+}
+
+/* ---- Fake basemap and station dots ---- */
+map.createPane('fakebg').style.zIndex = 200;
+map.createPane('fakedot').style.zIndex = 300;
+const bg = L.layerGroup().addTo(map), dots = L.layerGroup().addTo(map);
+let land = null;
+function drawBg() {
+  bg.clearLayers();
+  const dk = $('dark').checked;
+  map.getContainer().style.background = dk ? '#14181d' : '#bcd3e6';
+  if (land) L.geoJSON(land, { pane: 'fakebg', interactive: false,
+    style: { color: dk ? '#3a424c' : '#9aa5ad', weight: 1, fillColor: dk ? '#232a31' : '#eef0e8', fillOpacity: 1 } }).addTo(bg);
+  const line = { pane: 'fakebg', interactive: false, color: dk ? '#ffffff22' : '#00000018', weight: 1 };
+  for (let la = 2.4; la <= 4; la += 0.1) L.polyline([[la, 100.3], [la, 102.1]], line).addTo(bg);
+  for (let lo = 100.4; lo <= 102.1; lo += 0.1) L.polyline([[2.3, lo], [4, lo]], line).addTo(bg);
+}
+// Wet stations are dark dots, dry gauges are hollow grey ones.
+function drawDots() {
+  dots.clearLayers();
+  const dk = $('dark').checked;
+  for (const p of dry) L.circleMarker([p.lat, p.lng], { pane: 'fakedot', interactive: false, radius: 3, weight: 1,
+    color: dk ? '#98a3ad' : '#5f6b76', fillOpacity: 0 }).addTo(dots);
+  pts.forEach((p, i) => {
+    const m = L.circleMarker([p.lat, p.lng], { pane: 'fakedot', radius: i === sel ? 6 : 4, weight: i === sel ? 2 : 1,
+      color: i === sel ? (dk ? '#fff' : '#000') : (dk ? '#000' : '#fff'), fillColor: '#1b1f24', fillOpacity: 1 }).addTo(dots);
+    if (src === 'test') m.bindTooltip(`${p.name} · ${p.v.toFixed(3)}`).on('click', () => { idx = i; show(); });
+  });
+}
+$('dark').onchange = e => { document.documentElement.dataset.theme = e.target.checked ? 'dark' : 'light'; drawBg(); show(); };
+fetch('border.json').then(r => r.json()).then(j => { land = j.features.find(f => f.properties.t === 'land'); drawBg(); });
+map.on('moveend', () => { drawOverlay(); requestAnimationFrame(() => requestAnimationFrame(profile)); });
+
+const q = new URLSearchParams(location.search);
+if (q.get('layer') === 'rain') active = 'rain';
+const st0 = S();
+if (q.get('mode')) st0.mode = q.get('mode');
+if (q.get('core')) st0.core = +q.get('core');
+if (q.get('soft') === '0') st0.soft = false;
+if (q.get('drycore') === '0') st0.dryCore = false;
+if (q.get('blur')) st0.blur = +q.get('blur');
+idx = q.get('step') ? +q.get('step') - 1 : q.get('src') === 'test' ? 0 : 1;
+map.setView(AT, 11, { animate: false });
+drawBg();
+if (q.get('src') === 'test') { src = $('src').value = 'test'; await loadTest(); }
+show();
+</script>

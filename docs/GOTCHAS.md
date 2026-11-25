@@ -4063,3 +4063,12 @@ and `--muted` flip with the theme while the picture behind them does not. White 
 - **A shown layer and a stored layer are two values, and `visitLayer()` keeps them apart.**
   `PREFS` is one blob, and every `save()` writes all of it. Writing `PREFS.mapLayer` directly for a
   visit stores it with the next favorite. Go through `visitLayer()`.
+- **A cap on a blend must fade with distance, or one far station sets the class of a whole
+  cluster.** The water wash adds a share of the other hills to the highest one, and caps the result
+  at the highest station in reach. Until 2026-11-25 that cap was each station's full value anywhere
+  inside its 10 km reach. In the test storm, one flooded gauge (1.25) set the cap for about twenty
+  danger stations (1.0). They blended up to 1.25, and the map painted them all as water on the ground. Nothing errored, and
+  the cap made a vertical step in the side view wherever a station left reach. The cap is now each
+  station's value times its own edge fade. `heat-test.html` holds three danger stations next to a
+  flooded gauge 8 km away and asserts they stay at danger. `heat-levels.html` shows the step in side
+  view.

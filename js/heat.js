@@ -18,6 +18,7 @@
 // submerged one cannot paint it. Only a rainfall station reports rain.
 
 import { INTERP_KM, PRIOR_KM, COVER_KM, RAIN_FLOOR, WATER_INTERP_KM, WATER_PRIOR_KM,
+         WATER_CORE_KM, RAIN_CORE_KM, HEAT_BLUR_KM,
          RAIN_CLASSES, RAIN_CLASSES_DARK, WATER_CLASSES, WATER_CLASSES_DARK } from './config.js';
 import { PREFS } from './state.js';
 import { map } from './map.js';
@@ -58,7 +59,7 @@ const BASE = { radius: 70, blur: 55, maxZoom: 0 };
    `heat-tune.html` writes those options, one layer at a time. The app never does, so the values here
    are the shipped ones. `opacity` and `stepped` are null on a layer that follows the Settings
    controls. A number there overrides them for that layer alone. */
-const LOOK = { smooth: 0.1, sigma: 0.05, opacityMin: null, cellDiv: 12, cellMin: 8, cellMax: 16,
+const LOOK = { smooth: 0.1, sigma: 0.05, coreKm: 0, opacityMin: null, cellDiv: 12, cellMin: 8, cellMax: 16,
                opacity: null, stepped: null,
                power: 2, dryWeight: 1, nugget: 0, outlier: 0, outlierK: 4, hillPow: 2, blend: 0 };
 
@@ -324,6 +325,9 @@ const SoftHeat = L.HeatLayer.extend({
        `outlier` pulls a rain gauge toward the median of its neighbours. `hillPow` is the water
        falloff power, and `blend` adds a share of the other hills to the highest one. */
     const P = o.power ?? 2, HP = o.hillPow ?? 2, blend = o.blend ?? 0;
+    /* The core, in px. Inside it a station's distance counts as zero, so it holds its own value.
+       See WATER_CORE_KM in config.js. A dry rain gauge takes the core too. */
+    const corepx = (o.coreKm ?? 0) * kmpx;
     const w0 = 1 / Math.pow(D0, P), pin = 1 - (o.nugget ?? 0), dryW = o.dryWeight ?? 1;
     // True distance to the nearest gauge out past the cover margin and its blur, or the blur drags
     // the edge. The bucket is that wide, so a node always finds the gauge that sets its margin.
@@ -349,28 +353,37 @@ const SoftHeat = L.HeatLayer.extend({
               const dx = px - b[i][0], dy = py - b[i][1], dd = dx * dx + dy * dy;
               if (maxMode) {
                 if (dd >= r2) continue;
-                const d = Math.sqrt(dd), t = d / R;
+                const d = Math.sqrt(dd), t = d / R, taper = t > 0.5 ? ramp(t, 0.5) : 1;
+                // The hill falls from the core edge. The taper still keys on `d`, so the reach holds.
+                const dc = d > corepx ? d - corepx : 0;
                 // A short form stands in for `pow` at 1.5, 2.5, 3 and 4, which is several times slower.
-                const s = dd / D02;
+                const s = dc * dc / D02;
                 const q = HP === 2 ? s : HP === 1.5 ? Math.sqrt(s) * Math.sqrt(Math.sqrt(s)) : HP === 2.5 ? s * Math.sqrt(Math.sqrt(s)) : HP === 3 ? s * Math.sqrt(s) : HP === 4 ? s * s : Math.pow(s, HP / 2);
-                const hv = b[i][2] * (t > 0.5 ? ramp(t, 0.5) : 1) / (1 + q);
+                const hv = b[i][2] * taper / (1 + q);
                 hsum += hv;
-                if (b[i][2] > topV) topV = b[i][2];
+                /* **The cap fades with the station's own taper, and it was a step.** The blend can never
+                   go above this cap. It took each station's full value anywhere inside its reach, so the
+                   cap jumped where a station left reach, and one flooded gauge (1.25) let the blend of
+                   twenty danger stations (1.0) within 10 km paint them all as water on the ground. With
+                   the taper the cap is continuous, and a far station cannot lift a near one's class. */
+                const cap = b[i][2] * taper;
+                if (cap > topV) topV = cap;
                 if (d < nearD) { nearD = d; nearV = b[i][2]; }
                 if (hv > best) { best = hv; bestV = b[i][2]; bestD = d; }
                 continue;
               }
               if (dd < dmin2) { dmin2 = dd; vn = b[i][2]; }
               if (dd >= r2) continue;
-              const t = Math.sqrt(dd) / R;
-              const wgt = (t > 0.5 ? ramp(t, 0.5) : 1) * (b[i][3] ?? 1) / ((P === 2 ? dd : Math.pow(dd, P / 2)) + 1);
+              const d = Math.sqrt(dd), t = d / R, dc = d > corepx ? d - corepx : 0, dc2 = dc * dc;
+              const wgt = (t > 0.5 ? ramp(t, 0.5) : 1) * (b[i][3] ?? 1) / ((P === 2 ? dc2 : Math.pow(dc2, P / 2)) + 1);
               sw += wgt; swv += wgt * b[i][2];
             }
           }
         }
         const i = gy * cw + gx;
-        // The blend fills the gaps between stations, but it never goes above the highest station in
-        // reach. So it can never paint a class that no station reported.
+        // The blend fills the gaps between stations, but it never goes above the cap: the highest
+        // station in reach, faded by its own taper. So it can never paint a class that no station
+        // reported, and a far station cannot lift a near one.
         /* **Within a station's own plateau, that station decides, even if a neighbour's hill is higher
            there.** The put-back otherwise takes the station whose hill wins. Since the 2026-11-24
            tuning a wide flat hill can win at another station's own spot: a flooded gauge (1.25) reached
@@ -451,6 +464,9 @@ export const heat = new SoftHeat([], {
      red core, and blend 0.4 fills the ground between nearby hills. The blend is capped at the highest
      station in reach, so it never paints a class that no station reported. */
   hillPow: 2.5, blend: 0.4, minDefault: 0.25,
+  /* The flat core and the blur, chosen by the owner on 2026-11-25 in `heat-levels.html`. `sigma` is a
+     fraction of the reach, so this is HEAT_BLUR_KM on the ground. See WATER_CORE_KM in config.js. */
+  coreKm: WATER_CORE_KM, sigma: HEAT_BLUR_KM / WATER_INTERP_KM,
   /* Classes are the thresholds, not arbitrary fractions: `waterValue()` in js/util.js scores each
      station by where it sits on its own alert / warning / danger scale, so yellow means "past
      alert", orange "past warning" and red "at danger" — the same reading the pin and the meter give,
@@ -479,6 +495,9 @@ export const rainHeat = new SoftHeat([], {
   /* Tuned by the owner on 2026-11-23. A nugget of 0.5 lets the field smooth over a single gauge, so
      one odd reading draws a softer bullseye. */
   nugget: 0.5, minDefault: 0.25,
+  /* The same core and blur as water, on the owner's word of 2026-11-25. Rain has no cap to soften: a
+     mean never goes above its highest gauge. See RAIN_CORE_KM in config.js. */
+  coreKm: RAIN_CORE_KM, sigma: HEAT_BLUR_KM / INTERP_KM,
   classes: RAIN_CLASSES,
   dark: RAIN_CLASSES_DARK,
 });

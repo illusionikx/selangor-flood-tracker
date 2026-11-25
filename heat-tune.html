@@ -105,6 +105,7 @@ const SECTIONS = {
     ['Reach', [
       ['interpKm', 'Gauge reach', 'km. How far one gauge counts.', 2, 30, 0.5],
       ['priorKm', 'Pull to dry', 'km. Lower fades to no rain faster.', 1, 20, 0.5],
+      ['coreKm', 'Flat core', 'km. A gauge, wet or dry, holds its own weight out to here.', 0, 8, 0.5],
       ['coverKm', 'Cover limit', 'km. Ground past this from every gauge stays bare.', 1, 30, 0.5],
       ['floor', 'Floor', 'Least value drawn.', 0, 0.5, 0.005]]],
     ['How gauges mix', [
@@ -117,6 +118,7 @@ const SECTIONS = {
   water: [
     ['Reach', [
       ['interpKm', 'Hill reach', 'km. A hill ends here.', 2, 30, 0.5],
+      ['coreKm', 'Flat core', 'km. A station holds its own value out to here. The hill falls from the core edge.', 0, 8, 0.5],
       ['priorKm', 'Half distance', 'km. A hill halves here. This sets the wash size most, because a station at its alert mark ends here.', 1, 20, 0.5],
       ['floor', 'Floor', 'Least value drawn. 0.125 is half of the alert value.', 0, 0.5, 0.005]]],
     ['How hills mix', [
