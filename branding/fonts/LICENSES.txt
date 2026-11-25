@@ -1,0 +1,5 @@
+Archivo (Omnibus-Type) and JetBrains Mono (JetBrains) are licensed under the SIL Open Font License 1.1.
+https://openfontlicense.org  Free to use, embed and self-host; keep this notice with the files.
+
+archivo-expanded.woff2: Latin subset from Google Fonts, instanced to wdth 100-125, wght 600-900 (44 KB).
+jetbrains-mono.woff2:   Latin subset from Google Fonts, instanced to wght 400-700 (30 KB).

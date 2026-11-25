@@ -1,0 +1,53 @@
+/* Flood Watch brand tokens. Drop-in for css/base.css; see MIGRATION.md for where each line goes.
+   Calm UI, loud brand: the app keeps its neutral surfaces; volt blue is the accent and the brand fields. */
+
+@font-face {
+  font-family: 'Archivo'; font-style: normal; font-weight: 600 900; font-stretch: 100% 125%; font-display: swap;
+  src: url(archivo-expanded.woff2?v=1) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122, U+2191, U+2193;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url(jetbrains-mono.woff2?v=1) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2122, U+2191, U+2193;
+}
+
+:root {
+  /* brand constants: the same on both themes */
+  --brand-volt: #0038FF;
+  --brand-volt-light: #8AA4FF;
+  --brand-water: #5B86FF;
+  --brand-shallow: #E6ECFF;
+  --brand-ink: #0B0D10;
+  --brand-paper: #FFFFFF;
+  --brand-night: #0A1233;
+  --font-display: 'Archivo', 'Roboto', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* the one app token that changes: --accent (was #1a73e8). 6.98:1 on white, 6.27:1 on --hover. */
+  --accent: var(--brand-volt);
+  /* selected navigation item: ink (inverse surface), not the accent (decided 2026-11-25) */
+  --md-sys-color-secondary-container: var(--md-sys-color-inverse-surface);
+  --md-sys-color-on-secondary-container: var(--md-sys-color-inverse-on-surface);
+}
+:root[data-theme="dark"] {
+  /* was #8ab4f8. 6.77:1 on #202124, 5.47:1 on #303134; text on it stays --surface. */
+  --accent: var(--brand-volt-light);
+}
+
+/* The wordmark, everywhere it is set as text */
+.wordmark { font-family: var(--font-display); font-stretch: 125%; font-weight: 900; letter-spacing: -0.02em; text-transform: uppercase; }
+.reading { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Buttons: bold (decided 2026-11-25). One primary per surface; never a status colour. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 24px; border: 0; border-radius: 12px; cursor: pointer;
+  font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 13px;
+  letter-spacing: .02em; text-transform: uppercase; white-space: nowrap;
+}
+.btn.primary   { background: var(--accent); color: var(--md-sys-color-on-primary); }
+.btn.secondary { background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface); }
+.btn.text      { background: none; color: var(--md-sys-color-on-surface); text-decoration: underline; text-underline-offset: 3px; }
+.btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
+.btn:disabled { opacity: .38; cursor: default; }
