@@ -77,8 +77,13 @@
    **The bright riverbank rim lifts with everything else.** That rim is already recorded at 23%. See
    docs/FEATURES.md. */
 :root.carto[data-theme="dark"] .leaflet-labels-pane { filter: invert(1) hue-rotate(180deg); }
+/* **THE GROUND ENDS WITH A COLOUR MATRIX SINCE 2026-11-27 (MIGRATION.md Phase 1.3).** The inverted
+   Voyager drew its main roads brown and orange, next to the amber and red status pins. The owner
+   picked navy ground, green parks, blue water and silver roads. `#darkground` is an SVG matrix in
+   index.html, and it runs after the chain above, so that chain and its measurements stay as they are.
+   It is still one output pixel per input pixel. The place names do not take it. */
 :root.carto[data-theme="dark"] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(2.04) contrast(1.08);
+  filter: invert(1) hue-rotate(180deg) brightness(2.04) contrast(1.08) url(#darkground);
 }
 
 /* Zoom sits bottom-right (Maps-style), clear of the alert panel. */

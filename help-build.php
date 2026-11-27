@@ -57,7 +57,8 @@ foreach (SIZES as $width => $sz) foreach (SHOTS as $shot) {
          . ' --hide-scrollbars --user-data-dir=' . escapeshellarg("$tmp/profile-$name")
          . " --force-device-scale-factor={$sz['dpr']} --window-size=$winW,$winH"
          . ' --virtual-time-budget=120000 --screenshot=' . escapeshellarg($png)
-         . ' --dump-dom ' . escapeshellarg(PAGE . "?shot=$shot&w=$vw&h=$vh") . " 2>$null";
+         // `force`, because command-line headless Chrome does not report itself as automated.
+         . ' --dump-dom ' . escapeshellarg(PAGE . "?shot=$shot&w=$vw&h=$vh&force") . " 2>$null";
     echo "$name ... ";
     $dom = (string) shell_exec($cmd);
     preg_match('~<pre id="out">(.*?)</pre>~s', $dom, $m) || exit("no answer from the page\n");

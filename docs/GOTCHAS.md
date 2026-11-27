@@ -3875,6 +3875,12 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   other. Measured over 16 tiles of central Kuala Lumpur at zoom 14: the chain
   halves the share of pixels in the reserved amber band, from 20.40% to 9.89%, and it leaves what
   survives at a mean relative luminance of 0.049.
+  **Since 2026-11-27 the chain ends with `url(#darkground)`, an SVG colour matrix in `index.html`.** So
+  a fourth file takes part. If the `<filter>` is missing, the browser cannot resolve the reference. The
+  matrix makes the ground navy, the parks green, the water blue and the roads silver. It selects no
+  band, so each output pixel still reads its own input pixel. Do not give the `<svg>` `display: none`,
+  because some browsers then ignore the filter inside it. The amber figures above are measurements of
+  the chain before the matrix.
 - **INVERTING A LIGHT BASEMAP CRUSHES EVERY FEATURE INTO THE TOE, AND TWO TERMS PULL THEM BACK.**
   `invert()` runs on sRGB, not on linear light. Voyager separates a feature from the land by making
   it a little BRIGHTER: land is L 0.941 and a road is L 0.999, a 6% spread. The flip puts that whole
@@ -3944,6 +3950,22 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   percentile. That gesture sits on the 60 frames per second ceiling, so it holds no headroom to
   spend and it has nothing to report. Measure the rail travel instead.
   **These are headless numbers on one machine.** See docs/FEATURES.md for the tables.
+  **The matrix added on 2026-11-27 costs a little more.** Rail travel, dpr 1.25, A B B A three times,
+  headed Chrome: 69 dropped frames without `url(#darkground)` and 82 with it, of about 950 each. The
+  median stayed 16.7 ms and the 95th percentile 33 ms. At 4x CPU slowdown the counts were 102 and 109.
+  Without a GPU the two conditions were equal.
+- **LEAFLET PRUNES THE OLD ZOOM LEVEL ONCE, AND A LATE TILE KEEPS IT FOR EVER.** Leaflet 1.9.4 removes
+  old tiles 250 ms after the last new tile loads. A new tile that has not finished its fade by then keeps
+  its parents. `_updateOpacity` prunes only for a tile that was already active, so no later pass runs.
+  A cold landing on `/station/<id>` with late animation frames left z10 tiles at `scale(8)`. The opaque
+  ground hid its own copy, and the labels layer did not. `Ground._onOpaqueTile` in `js/map.js` runs one
+  more prune. To reproduce it, delay `requestAnimationFrame` by 450 ms and keep `cancelAnimationFrame`
+  working on the delayed ids.
+- **LEAFLET DROPS A `setView` WHILE A ZOOM ANIMATES, AND SAYS NOTHING.** `_tryAnimatedZoom` returns true
+  while `_animatingZoom` is set, so the new view never happens. `setLimits()` ran before the landing
+  `setView`, and `setMinZoom` and `setMaxBounds` started an animated move. The station zoom that came
+  next was lost, and a fast cold landing on `/station/<id>` stayed at zoom 10. In `coverReady`, set the
+  view first and the limits second.
 - **`detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.** Leaflet
   fills `{r}` with `@2x` whenever `devicePixelRatio` is above 1. `detectRetina` does a second
   thing: it asks for the next zoom at half the tile size. Measured on 2026-09-14 at 125% scaling
@@ -3994,6 +4016,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   is WITHOUT ROWID, keyed on `(station, ts)`. An index on `ts` alone finds a row and then looks it up
   in the table again. Measured on a copy on 2026-09-15, the 24 hour read went from 55 to 158 ms.
   `(ts, level)` covers every column those reads ask for, because that index carries the key as well.
+- **A PAGE THAT LOADS THE APP SHARES THE STORAGE OF WHOEVER OPENS IT.** `help-shot.html` writes
+  `prefs` to set the light theme, and the app in its frame writes more. It first lost a developer's
+  favorites and ignored list. A save on load and a restore on `pagehide` did not hold either, because
+  the live app wrote `prefs` after the restore. The page now refuses to run unless
+  `navigator.webdriver` is true or the address carries `force`. Command-line headless Chrome reports
+  `navigator.webdriver` as false, so `help-build.php` passes `&force`. A new page of this kind needs
+  the same refusal, and a restore is no substitute for it.
 - **A headless screenshot needs a frame of fixed size, and no CSS motion.** `help-shot.html` met two
   traps on 2026-10-19. First, `--screenshot` takes the window size, but the page lays out in a
   smaller viewport, and Chrome enforces a minimum window width of about 500px. A frame sized to the

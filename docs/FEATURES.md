@@ -21473,3 +21473,19 @@ The dark theme inverts the light Voyager tiles. The main roads then come out bro
 - The table's hover panel keeps its `.muted` place line. It is a hover panel, not a page or a dialog title.
 
 **Tests.** `title-test.html` asserts the two phone answers, the word from 360px and the mark alone under it, and that the lockup clears both button groups. `m3-check.html` gains `titleFace()`, which asserts the face, the weight, the capitals, the tracking and the wrap on each title. `brandBtn()` gains the outlined variant. The Settings assertions expect the rows again.
+
+## Brand R1.3: dark map ground, and two landing bugs (2026-11-27)
+
+**The dark ground has new colors.** The land is navy, parks are green, water is blue and roads are silver.
+The inverted Voyager drew the main roads brown and orange, next to the amber and red status pins. The tile pane keeps its filter chain and appends `url(#darkground)`, an SVG colour matrix inline in `index.html`. The place names keep their own filter. `map-limits-test.html` asserts the exact filter on each theme, and that `index.html` holds the matrix.
+
+**Old place names no longer show through.** On a cold landing, Leaflet sometimes kept the previous zoom level on the labels layer, stretched eight times. `Ground` in `js/map.js` now prunes once more after a late tile finishes its fade.
+
+**A cold landing on a station zooms to it.** The zoom limits started an animated move.
+That move swallowed the station zoom, and the map stayed at zoom 10. The landing view is now set before the limits.
+
+**The Help screenshot page refuses a manual visit.** `help-shot.html` loads the app, which shares the stored settings of the developer. A developer who opened it lost the favorites and the ignored list. A save and restore did not hold, because the live app wrote the settings after the restore. The page now runs only for a script, or with `?force`. `help-build.php` passes `&force`. A forced run still saves and restores the settings, as a best effort.
+
+**Trade-offs accepted.**
+- The matrix costs a few more dropped frames on a rail travel: 82 against 69 of about 950 in headed Chrome.
+- The matrix colors the whole ground tile. A road cannot change without the land and the water changing too.

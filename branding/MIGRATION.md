@@ -158,9 +158,8 @@ because this decision named Settings.
 
 **5. Dark map roads: not shipped.**
 
-`branding/review/dark-roads/` holds three variants of the dark tile filter, beside the current filter. Each one
-is shown at zoom 10 and 13 with test mode on. The README there
-lists each filter string and its cost. The owner picks one.
+Three variants of the dark tile filter went to the owner as local pictures at zoom 10 and 13, with test mode on.
+The pictures are not in git. Phase 1.3 records the choice.
 
 **6. A subtitle pairs with each title.** This was a follow-up decision on the same day.
 
@@ -189,6 +188,28 @@ so the count is set in the subtitle face. A kind with no reading is grey, the sa
   and on tap, because a glyph alone names nothing.
 - A card for one sensor shows one glyph.
 - The alert pane's count chips (`.achips`) stay M3 assist chips. This decision named the station card.
+
+## Phase 1.3 · Dark map ground (decided 2026-11-27, release R1.3)
+
+The owner picked a navy ground, green parks, blue water and silver roads. Branch `brand/r1.3-dark-ground`.
+
+The dark tile pane keeps its CSS filter chain and appends one SVG colour matrix, `url(#darkground)`:
+
+```
+invert(1) hue-rotate(180deg) brightness(2.04) contrast(1.08) url(#darkground)
+
+0.637 0.995 -0.874 0 0.012
+0.199 2.057 -1.218 0 0.033
+0.341 1.474 -0.010 0 0.098
+0     0      0     1 0
+```
+
+The matrix is inline in `index.html`, so there is no new file and no change to the Content-Security-Policy. It
+runs in sRGB, the same space as the chain before it. The labels pane keeps its own filter, and the light theme
+does not change.
+
+Cost, rail travel in headed Chrome at a device pixel ratio of 1.25: 69 dropped frames before and 82 after, of
+about 950. The median stayed 16.7 ms. WebKit and Firefox draw the same colors as Chrome.
 
 ## Phase 2 · Fonts
 
