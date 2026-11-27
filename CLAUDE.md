@@ -757,6 +757,7 @@ order that file holds them. A trap names itself here, and the file states the ev
 - `php api.php --selftest` runs near the top of the file and exits there, so a later `const` does...
 - A `preload` needs `crossorigin` when the code asks for the file with `fetch()`.
 - An index on `level(ts)` makes the rebuild slower, and `(ts, level)` makes it faster.
+- A PAGE THAT LOADS THE APP SHARES THE STORAGE OF WHOEVER OPENS IT.
 - A headless screenshot needs a frame of fixed size, and no CSS motion.
 - `<base href>` fixes every relative URL, and it must stay before every tag that holds one.
 - `history.back()` is asynchronous, and a `pushState` in the same task is undone by it.

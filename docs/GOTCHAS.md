@@ -4016,6 +4016,13 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   is WITHOUT ROWID, keyed on `(station, ts)`. An index on `ts` alone finds a row and then looks it up
   in the table again. Measured on a copy on 2026-09-15, the 24 hour read went from 55 to 158 ms.
   `(ts, level)` covers every column those reads ask for, because that index carries the key as well.
+- **A PAGE THAT LOADS THE APP SHARES THE STORAGE OF WHOEVER OPENS IT.** `help-shot.html` writes
+  `prefs` to set the light theme, and the app in its frame writes more. It first lost a developer's
+  favorites and ignored list. A save on load and a restore on `pagehide` did not hold either, because
+  the live app wrote `prefs` after the restore. The page now refuses to run unless
+  `navigator.webdriver` is true or the address carries `force`. Command-line headless Chrome reports
+  `navigator.webdriver` as false, so `help-build.php` passes `&force`. A new page of this kind needs
+  the same refusal, and a restore is no substitute for it.
 - **A headless screenshot needs a frame of fixed size, and no CSS motion.** `help-shot.html` met two
   traps on 2026-10-19. First, `--screenshot` takes the window size, but the page lays out in a
   smaller viewport, and Chrome enforces a minimum window width of about 500px. A frame sized to the

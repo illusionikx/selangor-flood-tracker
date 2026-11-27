@@ -21484,7 +21484,7 @@ The inverted Voyager drew the main roads brown and orange, next to the amber and
 **A cold landing on a station zooms to it.** The zoom limits started an animated move.
 That move swallowed the station zoom, and the map stayed at zoom 10. The landing view is now set before the limits.
 
-**The Help screenshot page keeps your settings.** `help-shot.html` loads the app, which shares the stored settings of the developer. It wrote `{theme: 'light'}` over them, and the favorites were gone. It now saves the stored value first and puts it back on `pagehide`. A copy also stays in storage, so a closed tab gets the settings back on the next load.
+**The Help screenshot page refuses a manual visit.** `help-shot.html` loads the app, which shares the stored settings of the developer. A developer who opened it lost the favorites and the ignored list. A save and restore did not hold, because the live app wrote the settings after the restore. The page now runs only for a script, or with `?force`. `help-build.php` passes `&force`. A forced run still saves and restores the settings, as a best effort.
 
 **Trade-offs accepted.**
 - The matrix costs a few more dropped frames on a rail travel: 82 against 69 of about 950 in headed Chrome.

@@ -5,6 +5,10 @@
      app. `php help-build.php` opens this page in headless Chrome, once for each picture, and reads
      the screenshot and the JSON in `#out` from the same run.
 
+     **IT REPLACES THE STORED SETTINGS OF WHOEVER OPENS IT.** The app in the frame shares this
+     origin's storage. So the page refuses to run unless a script drives the browser, or the address
+     carries `force`. `help-build.php` passes `&force`, in a throwaway profile.
+
      The page loads the app in a frame, then sets the state the picture needs:
        ?shot=main    the map, in test mode
        ?shot=panel   a station card open, on a flooded place with a camera
@@ -46,6 +50,14 @@
 <pre id="out"></pre>
 <script type="module">
 const q = new URLSearchParams(location.search);
+/* **STOP BEFORE ANY LINE THAT TOUCHES STORAGE.** A person on a dev machine lost their favorites here.
+   Headless Chrome started from a command line reports `navigator.webdriver` as false, so
+   `help-build.php` says `&force`. The throw ends the module. */
+if (!navigator.webdriver && !q.has('force')) {
+  document.body.textContent = 'This page is for help-build.php. It replaces your saved settings. '
+    + 'Add ?force to run it anyway.';
+  throw new Error('help-shot.html: not automated and no ?force');
+}
 const SHOT = q.get('shot') || 'main';
 const out = document.getElementById('out');
 const frame = document.getElementById('app');
@@ -88,11 +100,11 @@ async function until(what, fn, ms = 30000) {
 
 /* A fresh headless profile holds no preferences, so this states the one the picture needs. Help
    ships light pictures only, on the repository owner's call of 2026-10-19.
-   **A person can also open this page on a dev machine, and the app it loads shares their storage.**
-   So the page keeps the stored `prefs` first and puts them back on `pagehide`, or the favorites and
-   the ignored list are gone. The backup is in storage too, so a tab that dies before `pagehide`
-   gets them back on the next load of this page. The frame leaves first, because the app in it
-   still writes `prefs`. */
+   **With `?force` in a real browser, this keeps the stored `prefs` and puts them back on `pagehide`.**
+   **It is a best effort and it can fail.** A live app shares the storage, and it can write `prefs`
+   after the restore. That happened on 2026-11-27, and the favorites and the ignored list were gone.
+   So do not force this page in a profile that holds settings you want. The backup is in storage too,
+   so a tab that dies before `pagehide` gets them back on the next forced load. */
 const BACKUP = 'prefs.helpshot';
 // `null` in the backup means the key was never set.
 const restore = () => {
