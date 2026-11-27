@@ -144,7 +144,7 @@ function card(p, name = titleCase(p.n), sub = MET_NAME) {
   return `<div class="pophead">
       ${dots(p)}
       <div class="popname">${name}</div>
-      <div class="muted">${sub}</div>
+      <div class="subtitle">${sub}</div>
     </div>
     <details class="sensor" data-sensor="@wx" open>
       ${/* **THE HEAD'S GLYPH IS FIXED, and it followed the rung for one revision.** A reader cut

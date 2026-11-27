@@ -7,15 +7,16 @@
      face loaded.
 
      **The heading has TWO homes, and it is measured in both.** Below 600px it sits in the app bar.
-     That bar is a pill inside the map, and the brand there is 24px of mark with no room for a word.
      Above 600px the navigation rail holds it. A SHUT rail draws no heading at all. An OPEN rail is
-     164px and draws the mark and the word `FLOOD WATCH` at 13px. See `#brand` and `#rail #brand` in
+     164px and draws the mark and the word `FLOOD WATCH` at 13px. The phone bar draws the same
+     lockup from 360px, and the mark alone under it. See `#brand` and `#rail #brand` in
      css/chrome.css.
 
-     **Three boxes, three fixed answers, and no ladder.**
-       rail, shut      nothing at all
-       rail, open      the mark and the word, and the word fits
-       phone bar       the mark alone, and the word stays in the page for a screen reader
+     **Four boxes, four fixed answers, and no ladder.**
+       rail, shut           nothing at all
+       rail, open           the mark and the word, and the word fits
+       phone bar, 360+      the mark and the word, clear of both button groups
+       phone bar, <360      the mark alone, and the word stays in the page for a screen reader
 
      **Nothing is hard-coded about the fit.** The mark's own width and the heading's own `gap` are
      read back, so a change to either fails here rather than on somebody's screen.
@@ -33,7 +34,7 @@ const rows = [], fail = [];
 /* Reachability, not just fit. Three boxes, tracked apart, because each one is supposed to draw a
    DIFFERENT fixed answer, and a combined tally could not tell "always right" from "right
    somewhere". */
-const railShutDrawn = new Set(), railOpenWord = new Set(), phoneWord = new Set();
+const railShutDrawn = new Set(), railOpenWord = new Set(), phoneWord = new Set(), phoneMark = new Set();
 
 /* One reading of the lockup, wherever it is. `box` is the container the query measures, `need` is
    what the drawn word actually asks for: its own width, the mark beside it and the gap between the
@@ -141,14 +142,25 @@ const check = (label, r) => {
          a collapsed rail carries the destinations and nothing else. */
       if (wide && r.drawn) fail.push(`${w}px: a shut rail drew "${r.txt}" rather than nothing`);
       if (wide) railShutDrawn.add(r.drawn);
-      /* The phone bar states one width, so it has one answer: the mark alone. The word stays in the
-         page, clipped, so a screen reader still reads the heading. */
+      /* The phone bar has two answers, split at 360px since 2026-11-27. From 360px it draws the
+         rail's lockup, the mark and the word. Under 360px it draws the mark alone. The word stays in
+         the page there, clipped, so a screen reader still reads the heading. */
       if (!wide) {
-        if (r.word) fail.push(`${w}px: the phone bar drew the word "${r.txt}" beside the mark`);
+        const full = w >= 360;
+        if (full && !r.word) fail.push(`${w}px: the phone bar drew no word beside the mark`);
+        if (!full && r.word) fail.push(`${w}px: the phone bar drew the word "${r.txt}" under 360px`);
         if (!r.mark) fail.push(`${w}px: the phone bar lost its mark`);
         if (!r.inPage || !/flood watch/i.test(r.txt))
           fail.push(`${w}px: the word left the page, so a screen reader reads no heading`);
-        phoneWord.add(r.word);
+        /* The lockup is centred on the window, so it must clear both 40px button groups. */
+        if (r.word) {
+          const b = d.getElementById('brand').getBoundingClientRect();
+          const l = d.querySelector('header .hlead').getBoundingClientRect();
+          const t = d.querySelector('header .hactions').getBoundingClientRect();
+          if (b.left < l.right || b.right > t.left)
+            fail.push(`${w}px: the lockup ${b.left.toFixed(0)}-${b.right.toFixed(0)} overlaps a button group`);
+        }
+        (full ? phoneWord : phoneMark).add(r.word);
       }
     }
 
@@ -180,8 +192,10 @@ const check = (label, r) => {
     fail.push(`rail, shut drew a heading at some width: ${[...railShutDrawn]}`);
   if (railOpenWord.size !== 1 || !railOpenWord.has(true))
     fail.push(`rail, open did not always draw the word: ${[...railOpenWord]}`);
-  if (phoneWord.size !== 1 || !phoneWord.has(false))
-    fail.push(`the phone bar drew the word at some width: ${[...phoneWord]}`);
+  if (phoneWord.size !== 1 || !phoneWord.has(true))
+    fail.push(`the phone bar at 360px and up did not always draw the word: ${[...phoneWord]}`);
+  if (phoneMark.size !== 1 || !phoneMark.has(false))
+    fail.push(`the phone bar under 360px drew the word at some width: ${[...phoneMark]}`);
   out.innerHTML = rows.join('\n') + '\n\n' +
     (fail.length ? `<b class="f">FAIL</b>\n` + fail.join('\n') : '<b>PASS</b>');
 })().catch(e => { out.innerHTML = `<b class="f">THREW</b>\n${(e && e.stack) || e}`; });

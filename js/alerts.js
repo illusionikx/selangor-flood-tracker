@@ -524,7 +524,8 @@ export function alerts() {
     : '';
   /* **The chips sit at the top of the Sensors tab since 2026-10-14**, on the repository owner's
      instruction. Every chip counts sensors, so the app bar's chip line claimed them for the Notices
-     tab too. `.achips` is not `.badges`, so `openSide()` leaves the row in the body. */
+     tab too. `.achips` is not `.kindrow`, so `openSide()` leaves the row in the body. Since 2026-11-27
+     `openSide()` lifts `.kindrow` alone, so the paragraph above about `.badges` is history. */
   const chips = tally + near;
   const head = '<div class="pophead"><div class="popname">On alert</div></div>';
 

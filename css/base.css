@@ -588,6 +588,18 @@ td:last-child { text-align: right; padding-left: 16px; }
   border: 2px solid transparent; background-clip: content-box; border-radius: 999px;
 }
 .muted { color: var(--muted); font-size: 12px; }
+/* **The line under a title, since 2026-11-27 (MIGRATION.md Phase 1.2).** It pairs with the Archivo
+   capitals of a title the way the wordmark pairs FLOOD WATCH with the mono KLANG VALLEY line. The
+   capitals come from CSS alone, and the markup keeps its own case for a screen reader.
+   **It carries no `.muted`.** That class states a `font-size` too, and two classes on one element
+   would leave the size to source order. Each user swaps `.muted` for this class instead.
+   `font-stretch: normal` because a title above it sets 125%, and the lightbox nests this line inside
+   its title. `white-space: normal` and no ellipsis: a long line wraps and is never cut. */
+.subtitle {
+  font-family: var(--font-mono); font-weight: 500; font-size: 12px; font-stretch: normal;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  white-space: normal; overflow-wrap: break-word;
+}
 .glyph { font-size: 18px; }
 .up { color: var(--s-danger); } .down { color: var(--s-normal); }
 /* Rate of rise. The arrow travels the way the water is going: in from one side, half a second still
@@ -629,7 +641,7 @@ td:last-child { text-align: right; padding-left: 16px; }
    https://github.com/bczak/m3you/blob/development/src/components/Chip/chip.css
    A 32dp container, `shape-corner-small` (8dp), `label-large`, an 18dp leading icon, 8dp behind
    that icon and 16dp past the label. Unselected carries a 1dp outline over no fill. Selected drops
-   the outline and takes a container fill. That is the same set of numbers `#sideKinds .badge`
+   the outline and takes a container fill. That is the same set of numbers `.achips .badge`
    already takes for M3's assist chip, one variant over.
 
    **The drawer's kinds were full-width rows, one per line, and a chip is not a row.** `.chip` was
@@ -841,6 +853,9 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* **The brand's common button, from `branding/tokens/brand.css` (MIGRATION.md Phase 5b).** Three
    variants replace the ad-hoc `.link`, `.mtext` and `.tbtn`. `.btn.primary` is the ONE main act on a
    surface, `.btn.secondary` is a second act beside it, and `.btn.text` is a low-stakes act.
+   `.btn.outlined` joined them in Phase 1.2.
+   **Since Phase 1.2 a bold `.btn` stands only in a dialog and on the splash.** The Settings actions
+   went back to M3 list rows. The alert list's `Collapse all` keeps `.btn.text`, which is not bold.
    **Two rules hold it, and the second is the colour language.** One primary per surface, so two volt
    buttons never stand side by side. A button never takes a status colour, so a destructive confirm
    stays volt and names the act.
@@ -881,6 +896,20 @@ dialog:focus, dialog:focus-visible { outline: none; }
   background: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) var(--m3-state-press),
     var(--md-sys-color-inverse-surface));
 }
+/* **`.btn.outlined` is the safe answer beside a primary, since 2026-11-27 (MIGRATION.md Phase
+   1.2).** A 1px outline and ink text, with no fill, so the act beside it is the one filled shape.
+   `#confirmNo` is its one user. The padding gives back the 1px the outline takes, so the label sits
+   where a filled button puts it. The ink is `on-surface`, never the accent, because volt is the act. */
+.btn.outlined {
+  padding: 0 23px; border: 1px solid var(--md-sys-color-outline);
+  background: none; color: var(--md-sys-color-on-surface);
+}
+.btn.outlined:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--m3-state-hover), transparent);
+}
+.btn.outlined:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--m3-state-press), transparent);
+}
 .btn.text {
   background: none; color: var(--md-sys-color-on-surface);
   text-decoration: underline; text-underline-offset: 3px;
@@ -897,10 +926,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
   cursor: default; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
 }
-.btn.text:disabled { background: none; }
-/* A Settings action under a list: full width below 600px, at the list's own leading edge above. */
-.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
-@media (max-width: 600px) { .btnrow { flex-direction: column; } .btnrow .btn { width: 100%; } }
+.btn.text:disabled, .btn.outlined:disabled { background: none; }
 
 /* **A reading is set in JetBrains Mono with tabular figures (MIGRATION.md Phase 6, brand R1.1).**
    That covers a reading, a threshold, a rain total, a temperature, a clock stamp and a graph axis

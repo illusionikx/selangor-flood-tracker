@@ -21436,3 +21436,40 @@ A brand audit after release R1 found four gaps between `branding/` and the app. 
 
 **Checks.** `m3-check.html` gains `brandBtn()`, which asserts the class, the 48px height, the 12px corner, the capitals, Archivo, sentence-case markup and the fill token on each button. It also asserts that a chip and a plain button compute Roboto, and that an About link takes `--accent` with an underline. The Settings assertions now expect the buttons under the lists. All six render checks pass on the source and on the build, except three m3-check lines that read `flow-end` where they want `flex-end`. Those three fail on main too. Chrome 158 reports `justify-content` and `align-items` with the new keyword.
 
+
+## Brand R1.2: titles, phone lockup, buttons and dark roads (2026-11-27)
+
+The repository owner gave five decisions after seeing R1.1. `branding/MIGRATION.md` records them as Phase 1.2.
+
+**Titles are in the brand face.** Every page and dialog title is Archivo Expanded 800, in capitals, tracked .02em. The markup keeps its own case, and `text-transform` draws the capitals, so a screen reader reads words. One rule in `css/chrome.css` holds the face, beside the pane's app bar rule. It reaches the station name and On alert, and the four full-screen panes. It also reaches the warning, the lightbox, the confirm dialog, the narrow-screen block, and the section headings of Help and About.
+
+**The title size is not `headline-medium`.** Archivo Expanded capitals are about 0.8em a letter. At 28px, eleven letters filled a 360px line. `--title-size` is 22px over a 28px line above 600px, and 20px over 26px below it. One line fits the 56px label row of the 112px app bar. A long name wraps and is never cut. The longest name in the feed has 51 characters, and it takes three lines at 360px.
+
+**The phone app bar draws the lockup from 360px.** It uses the open rail's numbers: a 164px box, 13px type and a 24px mark. Under 360px the bar draws the mark alone, and the word stays in the page for a screen reader. At 360px the lockup spans 98 to 262px, clear of the two 40px button groups.
+
+**Cancel is outlined.** `.btn.outlined` is new: a 1px outline, ink text and no fill. `#confirmNo` uses it, so the act beside it is the one filled shape. The ink is `on-surface`, never the accent, because volt is the act.
+
+**A bold button stands only in a dialog and on the splash.** Settings uses list rows again.
+The five actions had that shape before R1.1. They are Refresh now, Reset settings, Remove all favorites, Stop ignoring all and the notification test. The test row reads "Send a test notification" again. `.btnrow` is deleted.
+
+**The dark map roads did not change.**
+The dark theme inverts the light Voyager tiles. The main roads then come out brown and orange, next to the amber and red pins. `branding/review/dark-roads/` holds three test variants for the owner to pick from: cool grey, slate and desaturated volt. Each is shown at zoom 10 and 13 with test mode on, beside the current filter. Its README holds each filter string.
+
+**A subtitle pairs with each title.** The line directly under a title takes `.subtitle`: JetBrains Mono 500, 12px, tracked .08em, in capitals, in `--muted`. That is the wordmark's own pairing, FLOOD WATCH over the mono KLANG VALLEY line. It reaches the station card's region line, the All stations and All cameras count lines, and the camera viewer's place line. Each one carries `.subtitle` in place of `.muted`, because `.muted` states a size of its own. The id rules that hold the count lines and the lightbox line state no font property, because two ids beat a class.
+
+**The station card's kind line is glyphs.** It drew one M3 assist chip per sensor kind. It now draws each kind's glyph in its own hue, with a count such as `×2` where a kind repeats. The row carries `.subtitle`, so the count is in the subtitle face. Each glyph is `role="img"` with the kind's name, and `data-tip` shows the same words on hover and on tap. The alert pane's count chips stay chips.
+
+**Trade-offs accepted.**
+- A title in Archivo Expanded capitals takes more lines than the same title in Roboto. A long station name pushes the bar to 140px or more on a phone.
+- The kind glyphs carry no words on screen. A reader learns a kind from the glyph, from the tip, or from the section heading in the card below.
+- The count lines were M3's `title-small` list subheader, at 14px. They are 12px now.
+- The camera viewer's place line truncated before. Now it wraps, and a long place can push the picture down a line.
+- The confirm title dropped from 24px to the title size, so the dialog states one title size with the panes.
+- A raster filter cannot tint the roads alone. Each road variant also tints the land, the parks and the sea.
+
+**Not built.**
+- The alert list's Collapse all keeps `.btn.text`. The owner's rule named Settings, and the alert list is a pane, not a dialog.
+- No road variant is in the app.
+- The table's hover panel keeps its `.muted` place line. It is a hover panel, not a page or a dialog title.
+
+**Tests.** `title-test.html` asserts the two phone answers, the word from 360px and the mark alone under it, and that the lockup clears both button groups. `m3-check.html` gains `titleFace()`, which asserts the face, the weight, the capitals, the tracking and the wrap on each title. `brandBtn()` gains the outlined variant. The Settings assertions expect the rows again.

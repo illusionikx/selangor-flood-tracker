@@ -120,6 +120,76 @@ text reads pastel, and the brand loses the boldness it has in the light theme.
 - `tokens/tokens.json` gains `accentFill` (`#0038FF` / `#2F5BFF`). `m3-check.html` reads the FAB and switch
   colours; update the expected values. Add the split to CLAUDE.md's colour language.
 
+## Phase 1.2 · Titles, phone lockup, buttons, dark roads (decided 2026-11-27, release R1.2)
+
+The owner gave five decisions after seeing R1.1. Branch `brand/r1.2`.
+
+**1. Titles are in the brand face.** Every page and dialog title uses `var(--font-display)`, weight 800,
+`text-transform: uppercase` and `letter-spacing: .02em`. The markup keeps its own case.
+
+- The pane titles: a station name and On alert.
+- The full-screen panes: All stations, All cameras, Settings and its subpages, and Help.
+- The dialogs: the forecast warning, the camera lightbox, the confirm dialog and the narrow-screen block.
+- The section headings of Help and About. About's own title is its logo lockup, which was already Archivo.
+
+- Size: `--title-size` is 22px over a 28px line above 600px, and 20px over 26px below it. `headline-medium`
+  (28px) put eleven Archivo Expanded capitals on a 360px line. One line fits the 56px label row of the 112px
+  medium app bar with room to spare.
+- A long name wraps and is never cut. `overflow-wrap: break-word` breaks a single word wider than the line.
+  The longest name in the feed (51 characters) takes three lines at 360px.
+- The lightbox's second line (`.lbwhere`) keeps its own case.
+
+**2. The phone app bar draws the rail lockup from 360px.**
+
+It uses the numbers of the open rail: a 164px box, 13px type and a 24px mark. Under 360px it draws the mark
+alone. At 360px the lockup spans 98 to 262px
+and the two 40px button groups end at 48 and start at 312. `title-test.html` asserts both answers and the clear
+space.
+
+**3. Cancel is outlined.** New variant `.btn.outlined`: a 1px `--md-sys-color-outline` border, `on-surface` text,
+no fill. `#confirmNo` uses it. `#confirmYes` stays `.btn.primary`.
+
+**4. A bold `.btn` stands only in a dialog and on the splash.**
+
+Five Settings actions are M3 list action rows again, as before R1.1. They are Refresh now, Reset settings,
+Remove all favorites, Stop ignoring all and the notification test. The test
+row is "Send a test notification" again. `.btnrow` is deleted. The alert list's Collapse all keeps `.btn.text`,
+because this decision named Settings.
+
+**5. Dark map roads: not shipped.**
+
+`branding/review/dark-roads/` holds three variants of the dark tile filter, beside the current filter. Each one
+is shown at zoom 10 and 13 with test mode on. The README there
+lists each filter string and its cost. The owner picks one.
+
+**6. A subtitle pairs with each title.** This was a follow-up decision on the same day.
+
+The line directly under a title takes the new class `.subtitle` in `css/base.css`: JetBrains Mono 500, 12px,
+`letter-spacing: .08em`, uppercase, `--muted`. This is the wordmark's own pairing, FLOOD WATCH over the mono
+KLANG VALLEY line. The capitals come from CSS alone, and the source text keeps its case.
+
+- The station card's region and basin line, which `openSide()` lifts into `#sideSub`. The Your Location card
+  and the weather card use the same slot, so their accuracy line and place line take it too.
+- The All stations count line (`#dataCount`) and the All cameras count line (`#camCount`).
+- The camera viewer's place line under the camera name (`.lbwhere`).
+- The alert pane has no line under On alert, and no other dialog has a line under its title.
+
+Each user carries `.subtitle` in place of `.muted`. `.muted` states a `font-size` of its own, so with two classes
+the size depends on source order. The id rules that hold the count lines and the lightbox line state no
+font property, because two ids beat a class. A long line wraps and is never cut. The lightbox line used to
+truncate with an ellipsis, and now it wraps.
+
+**7. The station card's kind chips are glyphs.** This was a second follow-up on the same day.
+
+The row under the place line drew one M3 assist chip per sensor kind. It now draws the kind's glyph alone, in
+its kind hue, with a count where a kind repeats: water level, `×2`, siren, camera. The row carries `.subtitle`,
+so the count is set in the subtitle face. A kind with no reading is grey, the same rule the chip followed.
+
+- Each glyph is `role="img"` with the kind's name, such as "Siren ×2". `data-tip` shows the same words on hover
+  and on tap, because a glyph alone names nothing.
+- A card for one sensor shows one glyph.
+- The alert pane's count chips (`.achips`) stay M3 assist chips. This decision named the station card.
+
 ## Phase 2 · Fonts
 
 | File | Change |
@@ -203,6 +273,7 @@ face, in both homes (app bar and rail), on both targets.
 | `.btn.primary` | `--accent` fill (#0038FF), white label (6.98:1) | #8AA4FF fill, #202124 label (6.77:1) | The ONE main act on a surface: Near me, Remove all, Try again |
 | `.btn.secondary` | Ink fill (#1F1F1F), white label | #E8EAED fill, #202124 label | A second act beside it: Show on map, Raw payload |
 | `.btn.text` | `--on-surface` label, underlined | same | Cancel, Back, low-stakes acts |
+| `.btn.outlined` | 1px outline, `--on-surface` label, no fill | same | The safe answer beside a primary (added in Phase 1.2) |
 
 Shared: `min-height: 48px`; `padding: 0 24px`; `border-radius: 12px` (`--md-sys-shape-corner-medium`);
 Archivo Expanded 800, 13px, `font-stretch: 125%`, `letter-spacing: .02em`, `text-transform: uppercase`; the label
@@ -212,8 +283,8 @@ stays sentence case in the markup (screen readers read words, not shouting); hov
 
 **Treading carefully: the guardrails**
 
-1. **One primary per surface.** Never two volt buttons side by side. The confirm dialog is primary + secondary
-   (changed 2026-11-27 in R1.1: Cancel is `.btn.secondary`, not `.btn.text`).
+1. **One primary per surface.** Never two volt buttons side by side. The confirm dialog is primary + outlined
+   (R1.1 made Cancel `.btn.secondary`, and Phase 1.2 made it `.btn.outlined`).
 2. **Never a status colour.** A destructive confirm stays volt and names the act (“Remove all”), as `ask()` already
    requires. Red stays the map's.
 3. **Short labels.** Two words, about 14 characters. Archivo capitals are wide: “SHOW ON MAP” at 13px is about
@@ -234,7 +305,7 @@ stays sentence case in the markup (screen readers read words, not shouting); hov
 | `index.html` 262 | Splash “Try again” → `.btn.primary` (on the white warning card, never on volt). |
 | `index.html` 855–856 | The two confirm buttons. |
 | `js/alerts.js` 53 | `class="tbtn"` → `class="btn text"`. |
-| Settings action buttons | Changed 2026-11-27 in R1.1. Refresh now, Reset settings, Remove all favorites, Stop ignoring all and the notification test are `.btn.secondary` in a `.btnrow` under their list. Raw payload is a link and stays a list row. |
+| Settings action buttons | R1.1 made them `.btn.secondary` under each list. Phase 1.2 put them back as M3 list action rows. See Phase 1.2. |
 
 **Docs and checks.** `CLAUDE.md`'s writing standard says sentence case for every rendered string and lists the
 ALL-CAPS blocks as the exception; add buttons to that exception, noting the caps are CSS only. `m3-check.html`

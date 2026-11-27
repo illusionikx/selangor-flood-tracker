@@ -167,10 +167,10 @@ header {
    capitals. The markup keeps sentence case and `text-transform` draws the capitals, so a screen reader
    reads words. It draws only where the box is wide enough, and it never ellipsises. A word that
    clips is a wrong name.
-   **Three boxes, three fixed answers.** A shut rail draws no heading at all. An open rail draws the
-   mark and the word. The phone bar draws the mark alone, and the word stays in the page for a screen
-   reader. No box in this app varies continuously. `title-test.html` reads all three back in rendered
-   pixels.
+   **Four boxes, four fixed answers.** A shut rail draws no heading at all. An open rail draws the
+   mark and the word. The phone bar draws the same lockup from 360px. Under 360px it draws the mark
+   alone, and the word stays in the page for a screen reader. No box in this app varies
+   continuously. `title-test.html` reads all four back in rendered pixels.
    **`KLANG VALLEY` is not in this lockup.** The brand kit sets it as a descriptor under the word.
    The open rail has no height to spare for it, so it lives in the About box and on the splash. */
 #brand .word {
@@ -1453,9 +1453,7 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
 #confirmBox::backdrop { background: #0006; }
 .mdlgtitle {
   margin: 0; color: var(--md-sys-color-on-surface);
-  font-size: var(--md-sys-typescale-headline-small-size);
-  line-height: var(--md-sys-typescale-headline-small-line-height);
-  font-weight: var(--md-sys-typescale-headline-small-weight);
+  font-size: var(--title-size); line-height: var(--title-lh);
 }
 .mdlgbody {
   margin: 16px 0 0; color: var(--md-sys-color-on-surface-variant);
@@ -1463,9 +1461,10 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
   line-height: var(--md-sys-typescale-body-medium-line-height);
   letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
-/* The footer holds `#confirmNo` (`.btn.secondary`) and `#confirmYes` (`.btn.primary`), Cancel first.
+/* The footer holds `#confirmNo` (`.btn.outlined`) and `#confirmYes` (`.btn.primary`), Cancel first.
    It stays on one line at every width, which MIGRATION.md Phase 5b states for a dialog footer. The
-   verb is short, so two buttons fit 312px. `.mtext`, M3's 40px text button, is gone. */
+   verb is short, so two buttons fit 312px. Cancel was a filled `.btn.secondary` in R1.1. Two
+   filled buttons gave the safe answer the same weight as the act, so Phase 1.2 made it outlined. */
 .mdlgfoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
@@ -1503,22 +1502,14 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
   flex: none; padding: 0 0 12px;
   background: var(--surface);
 }
-/* **M3's list subheader**, the same component the alert panel, the Notices pane and Settings draw:
-   `title-small` in `on-surface-variant`, 48dp, at the pane's own inset. One panel states one
-   heading style, and a count sitting at 12px under a 28px headline was a third size in one box.
-   **The size has to be stated.** `.muted` carries a `font-size` of its own as well as the colour,
-   and a declaration on the element beats anything the context passes down. That is the trap the
-   rain chart's axis labels already record.
-   Two other rules state this same subheader: `.nsub` and `#settingsBox h3`. State the tracking
-   and the weight the same way they do. */
+/* **The count line is the brand `.subtitle` since 2026-11-27 (MIGRATION.md Phase 1.2).** It was
+   M3's list subheader, `title-small`, the shape `.nsub` and `#settingsBox h3` still draw. The class
+   states the face. This rule keeps the box: 48dp at the pane's own inset.
+   **No font property here.** Two ids beat a class, so any face stated here would win over
+   `.subtitle`. `flex-wrap` lets a long count wrap inside the 48dp row and grow it. */
 #dataBox #dataCount, #camBox #camCount {
-  display: flex; align-items: center;
+  display: flex; align-items: center; flex-wrap: wrap;
   min-height: 48px; margin: 0; padding: 0 var(--pane);
-  color: var(--muted); text-transform: none;
-  font-size: var(--md-sys-typescale-title-small-size);
-  line-height: var(--md-sys-typescale-title-small-line-height);
-  font-weight: var(--md-sys-typescale-title-small-weight);
-  letter-spacing: var(--md-sys-typescale-title-small-tracking);
 }
 /* **The headline box moves to a margin, so it starts where the filter field starts.** `.apflex`
    states its inset as padding everywhere else, which puts the box itself flush with the app bar's
@@ -2065,9 +2056,8 @@ table.data .dash { color: var(--outline); }
    row that stops the title shrinking, so a long one runs past the card instead of wrapping. */
 #warnBox .warnhead { display: flex; align-items: flex-start; gap: 12px; }
 #warnBox .warnhead > .i {
-  font-size: var(--md-sys-typescale-headline-medium-size);
-  margin-top: calc((var(--md-sys-typescale-headline-medium-line-height)
-                    - var(--md-sys-typescale-headline-medium-size)) / 2);
+  font-size: var(--title-size);
+  margin-top: calc((var(--title-lh) - var(--title-size)) / 2);
 }
 #warnBox .warnhead h2 { flex: 1; min-width: 0; }
 /* The bulletin title pins to the top of the scroller and the valid time and the source sit under
@@ -3070,19 +3060,33 @@ body.side #side { display: flex; }
 /* `headline-medium`, in `on-surface`. It was `title-large` in `--muted`: an app bar headline is the
    screen's own name and takes the full ink, where a side sheet title is a label over a panel. */
 #sideTitle .popname, .apflex h2 {
-  flex: none; margin: 0; font-weight: 400; color: var(--on-surface);
-  font-size: var(--md-sys-typescale-headline-medium-size);
-  line-height: var(--md-sys-typescale-headline-medium-line-height);
+  flex: none; margin: 0; color: var(--on-surface);
+  font-size: var(--title-size); line-height: var(--title-lh);
 }
-/* `body-medium` at weight 500, in `on-surface-variant`. **The size has to be restated.** `.muted`
-   carries `font-size: 12px` as well as the colour, and a declaration on the element beats anything
-   the context passes down — the same trap the rain chart's axis labels already document. */
-#sideSub, #sideSub .muted {
-  font-weight: 500; color: var(--muted);
-  font-size: var(--md-sys-typescale-body-medium-size);
-  line-height: var(--md-sys-typescale-body-medium-line-height);
-  letter-spacing: var(--md-sys-typescale-body-medium-tracking);
+/* **Every page and dialog title is set in the brand face, since 2026-11-27 (MIGRATION.md Phase
+   1.2).** Archivo Expanded 800, in capitals, tracked .02em. The markup keeps its own case, and
+   `text-transform` draws the capitals, so a screen reader reads words. It covers the pane's app bar
+   (a station, `On alert`), the four full-screen panes, the warning, the lightbox, the confirm
+   dialog, the narrow-screen block, and the section headings of Help and About.
+   **The size is NOT `headline-medium`.** Archivo Expanded in capitals is about 0.8em a letter, and
+   28px put eleven letters on a 360px line. `--title-size` is 22px above 600px and 20px below it.
+   One line then fits the 56px label row of the 112px bar with 16px to spare.
+   **A long name wraps and never ellipsises**, the rule this bar already states. `overflow-wrap` breaks
+   a single word wider than the line, such as a station code joined with dots, instead of letting it
+   run past the card. */
+:root { --title-size: 22px; --title-lh: 28px; }
+@media (max-width: 600px) { :root { --title-size: 20px; --title-lh: 26px; } }
+#sideTitle .popname, .apflex h2, .mdlgtitle, #lightbox h2, #narrowBox h2,
+:is(#helpBox, #aboutBox) .docbody h3 {
+  font-family: var(--font-display); font-stretch: 125%; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .02em;
+  white-space: normal; overflow-wrap: break-word;
 }
+/* The app bar's supporting line is the brand `.subtitle` since 2026-11-27 (MIGRATION.md Phase 1.2),
+   and it was M3's `body-medium` at weight 500. The class states the face, so this box states only
+   the line height. It used to restate the size against `.muted`, and the line no longer carries
+   that class. */
+#sideSub { line-height: 16px; }
 #sideSub:empty { display: none; }
 /* **One M3 ASSIST CHIP per sensor kind, and it was a `.badge`.** Transcribed from `Chip/chip.css`
    in the M3 Expressive component set: a 32dp container, `shape-corner-small` (8dp), a 1dp outline
@@ -3102,12 +3106,21 @@ body.side #side { display: flex; }
    `.badge` is still untouched in the all-stations table, which is a dense grid rather than a pane.
    It spent one revision as a 32dp chip there too. The repository owner reversed that on
    2026-08-26, after seeing it on screen. A chip in a table cell is a row height. */
+/* **The station card's kind line is GLYPHS, not chips, since 2026-11-27 (MIGRATION.md Phase 1.2).**
+   The owner cut the chips and kept each kind's glyph in its own hue, with `×2` where a kind repeats.
+   The row carries `.subtitle`, so the count is the subtitle face. So the chip rules below now serve
+   the alert pane's `.achips` alone, and the paragraph above is that component's history.
+   18px is the chip's own glyph size. 12px between kinds, and 2px between a glyph and its count, so
+   `×2` reads as belonging to the glyph before it rather than to the one after. */
 #sideKinds:empty { display: none; }
-#sideKinds .badges, .achips { display: flex; flex-wrap: wrap; gap: 8px; }
+#sideKinds .kindrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+#sideKinds .kg { display: inline-flex; align-items: center; gap: 2px; }
+#sideKinds .kg .i { font-size: 18px; color: var(--c); }
+.achips { display: flex; flex-wrap: wrap; gap: 8px; }
 /* The alert pane's chips, at the top of the Sensors tab since 2026-10-14. Same chip, so the rules
    below name both homes. */
 .achips { margin: 12px 0 4px; }
-#sideKinds .badge, .achips .badge {
+.achips .badge {
   height: 32px; margin: 0; padding: 0 16px 0 8px; gap: 8px;
   border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small);
   background: none; color: var(--on-surface); text-transform: none;
@@ -3116,7 +3129,7 @@ body.side #side { display: flex; }
   font-weight: var(--md-sys-typescale-label-large-weight);
   letter-spacing: var(--md-sys-typescale-label-large-tracking);
 }
-#sideKinds .badge .i, .achips .badge .i { font-size: 18px; color: var(--c); }
+.achips .badge .i { font-size: 18px; color: var(--c); }
 /* The alert pane's chips are buttons since 2026-10-14: a press opens their section. M3's assist chip
    takes an `on-surface` state layer. */
 .achips button.badge { font-family: inherit; cursor: pointer; }
@@ -3321,9 +3334,9 @@ body.side #side { display: flex; }
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-/* `.tally` is gone. Every count in the alert head is an M3 assist chip now, in a `.badges` row that
-   `openSide()` lifts into `#sideKinds` — the app bar's own chip line. So the numbers take
-   `#sideKinds .badge` with everything else, and this file states the chip once.
+/* `.tally` is gone. Every count in the alert head is an M3 assist chip now, in the `.achips` row
+   at the top of the Sensors tab. So the numbers take `.achips .badge`, and this file states the
+   chip once.
    The pill it replaced set its own ink with `color-mix(in srgb, var(--c) 70%, var(--on-surface))`,
    because a 12px number in its own colour on a tint of itself starts under 4.5:1. `.state` in
    `css/base.css` still needs that expression and still carries it. A chip does not: the label is
@@ -3609,13 +3622,13 @@ body.side #side { display: flex; }
 /* Two lines: the camera's name, then its district and state. It wraps rather than truncating — the
    dialog is sized by the picture and is at least 460px wide, so a long place name has the room, and
    half a place name is worse than two lines of one. */
-#lightbox h2 { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; line-height: 1.3; }
-/* The second line does truncate. It is context, not the answer, and it must not push the picture
-   down a line on a narrow dialog. */
-#lbTitle .lbwhere {
-  display: block; font: 400 12px/1.35 Roboto, sans-serif; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+#lightbox h2 { flex: 1; min-width: 0; font-size: 16px; line-height: 1.3; }
+/* **The second line is the brand `.subtitle` and it wraps, since 2026-11-27 (MIGRATION.md Phase
+   1.2).** It truncated before, on the argument that it must not push the picture down a line. The
+   owner's rule for every subtitle is that a long line wraps and is never cut. `js/ui.js` writes the
+   class. This rule states only the box and the line height, because an id beats the class, and any
+   face stated here would win over it. */
+#lbTitle .lbwhere { display: block; margin-top: 2px; line-height: 1.35; }
 /* Grid, so the spinner and the frame occupy the same cell — the box does not jump when one
    replaces the other. The min-height is what stops it collapsing to nothing while loading. */
 #lightbox .lbbody { display: grid; place-items: center; min-height: 140px; }
@@ -4092,7 +4105,7 @@ body.side #side { display: flex; }
    reach — and it took 15px off the height of the block itself. */
 :root:has(#narrowBox[open]) { overflow: hidden; }
 #narrowBox .mark { font-size: 40px; color: var(--accent); }
-#narrowBox h2 { font-size: 17px; font-weight: 500; }
+#narrowBox h2 { font-size: 17px; }
 #narrowBox p { font-size: 13px; line-height: 1.5; max-width: 34ch; }
 
 /* Splash: covers the map until the first poll lands. */
@@ -4200,18 +4213,29 @@ body.side #side { display: flex; }
   /* **`--hdr` is 0 here too, and the header is the same pill it is on a desktop.** It was 85px of
      two-row bar: the brand on line one and the ticker on line two. The repository owner asked for
      that space back on 2026-08-24. */
-  /* **The mark alone, centred in the bar.** The brand is 24px of mark in a shared pill. The word
-     does not fit beside it at this width, and the repository owner chose the mark alone on
-     2026-11-25. The word stays in the page, clipped to one pixel, so a screen reader still reads the
+  /* **The mark alone under 360px, centred in the bar.** The word does not fit beside the mark
+     there. The word stays in the page, clipped to one pixel, so a screen reader still reads the
      heading `Flood Watch`. `display: none` would remove it from the accessibility tree.
      `container-type: inline-size` contains this box, so the width is stated and never taken from the
-     content. 24px is the mark. It clears the two trailing buttons at every width this app answers
-     for. That group is 80px wide at `right: 8px` and the bar centres the brand on the WINDOW. */
+     content. 24px is the mark. The bar centres the brand on the WINDOW. */
   #brand { flex: none; width: 24px; max-width: none; }
   #brand .word {
     display: block; position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
     clip-path: inset(50%);
   }
+}
+/* **From 360px the phone bar draws the rail's own lockup**, on the repository owner's instruction of
+   2026-11-27 (MIGRATION.md Phase 1.2). It was the mark alone. The numbers are the open rail's: a
+   164px box, 13px type and a 24px mark. The lockup needs 153px. At 360px the box spans 98 to 262,
+   and the two 40px buttons end at 48 and start at 312. `title-test.html` reads that back.
+   `header #brand` is one element more specific than the clip rule above, so it wins at any order. */
+@media (min-width: 360px) and (max-width: 600px) {
+  header #brand { width: 164px; font-size: 13px; }
+  header #brand .word {
+    display: inline; position: static; width: auto; height: auto; margin: 0; clip-path: none;
+  }
+}
+@media (max-width: 600px) {
   /* **The ramp has no phone rule any more.** It stated 18px, and the base rule states
      `min(56px, 9%)`, which is 32px here. Nothing else about the pill changes: every token in its
      offsets is 0 on a phone, so the base rule already lands it 12px inside a full-bleed map. */

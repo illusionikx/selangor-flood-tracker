@@ -2768,9 +2768,9 @@ and `--muted` flip with the theme while the picture behind them does not. White 
   `narrow-test.html` reads `NARROW_PX` out of the source and guards all three silent faults.
 - **The heading has TWO homes, and a wordmark measured in each.** **Rebranded on 2026-11-25.** The
   text below describes the old ladder. Now there is one spelling, `FLOOD WATCH` in Archivo Expanded
-  900 at 13px in the rail. The open rail draws the mark and the word, and the phone bar draws the
-  mark alone. The word stays in the page there, clipped to one pixel, so a screen reader still reads
-  the heading. **Do not hide it with `display: none`.** That removes it from the accessibility tree.
+  900 at 13px in the rail. The open rail draws the mark and the word. Since 2026-11-27 the phone bar
+  draws the same lockup from 360px, and the mark alone under 360px. The word stays in the page there,
+  clipped to one pixel, so a screen reader still reads the heading. **Do not hide it with `display: none`.** That removes it from the accessibility tree.
   **If the wordmark font fails to load, the word falls back to Roboto and still fits.** Roboto is
   narrower. So `title-test.html` also asks `document.fonts.check()`. `#brand` is written into
   `<header>`, which is where a phone keeps it. Above 600px the navigation rail runs the full height

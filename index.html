@@ -119,9 +119,9 @@
      Before `base.css`, which derives `--m3-travel`, `--m3-grow` and `--m3-swap` from them and
      bridges M3's colour names onto this app's palette. Colour is not in this file on purpose. -->
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
-<link rel="stylesheet" href="css/base.css?v=205">
-<link rel="stylesheet" href="css/chrome.css?v=342">
-<link rel="stylesheet" href="css/map.css?v=190">
+<link rel="stylesheet" href="css/base.css?v=208">
+<link rel="stylesheet" href="css/chrome.css?v=346">
+<link rel="stylesheet" href="css/map.css?v=192">
 
 <!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
      Matter, in js/map.js, and went again on 2026-09-15. No markup here carries it. -->
@@ -278,8 +278,9 @@
      above the two panes, so this element does not draw at all there.
      **It holds the wordmark, centred, and one trailing group.** The repository owner asked for the
      glyph on 2026-08-24 and for the words in its place the same day. The news left this element for
-     a pill inside the map, so there is nothing here to share the row with. The mark is hidden at
-     this width — see `#brand` in css/chrome.css — so the words carry the identity alone.
+     a pill inside the map, so there is nothing here to share the row with. From 360px the bar draws
+     the mark and the word, the open rail's lockup. Under 360px it draws the mark alone. See `#brand`
+     in css/chrome.css.
      **`#brand` lives here in the markup and moves into the rail above 600px.** One heading, two
      homes, and js/ui.js moves it on the breakpoint. A second copy is a second `<h1>` for a screen
      reader to read. -->
@@ -740,7 +741,7 @@
   </ul>
 
   <!-- **The developer controls, as one segmented list.** The order is a reader's own, 2026-08-25:
-       the switch, then the readings, then Raw payload, then two buttons under the list.
+       the switch, then the readings, then the three actions.
        **The readings are a row of the same list and take no press.** `.readout` carries the table
        rather than a headline, so the group reads as one block and nothing about it invites a tap.
        **`#devForce` hides on the Pages build**, and `js/ui.js` hides its `<li>`. Hiding the button
@@ -757,39 +758,41 @@
     <!-- The readings table moved to a subpage on the repository owner's instruction of 2026-10-15. -->
     <li><button class="mrow" id="devReadings" data-page="setReadings"><i class="glyph" aria-hidden="true"></i
       ><span class="nm">Readings</span><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
+    <!-- **The two developer acts are list action rows again, since 2026-11-27 (MIGRATION.md Phase
+         1.2).** Brand R1.1 made them brand buttons under the list for one day. A bold `.btn` now
+         stands only in a dialog and on the splash. -->
+    <li><button class="mrow" id="devForce"><i class="glyph i i-refresh"></i
+      ><span class="nm">Refresh now</span></button></li>
     <li><a class="mrow" id="devRaw" href="api.php" target="_blank" rel="noopener"
       ><i class="glyph i i-open_in_new"></i><span class="nm">Raw payload</span></a></li>
+    <li><button class="mrow" id="devReset"><i class="glyph i i-restart_alt"></i
+      ><span class="nm">Reset settings</span></button></li>
   </ul>
-  <!-- **The two developer acts are brand buttons under the list, since 2026-11-27 (brand R1.1).**
-       They were list action rows. Raw payload stays a row, because it is a link and not a button.
-       Neither is a primary: Settings has no one main act. `#devForce` hides itself on the Pages
-       build, and `.btn[hidden]` makes that work. -->
-  <div class="btnrow">
-    <button class="btn secondary" id="devForce">Refresh now</button>
-    <button class="btn secondary" id="devReset">Reset settings</button>
-  </div>
   </div><!-- /#setMain -->
 
   <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
        search box groups by site because it matches the map, and this panel manages the saved list
        itself, so it has to show every id the list holds. A reader who starred one gauge of six
        needs to see which one.
-       **The clear action is a brand button under the list, since 2026-11-27.** `render.js` owns the
-       list's `innerHTML`, so the button sits in a `.btnrow` beside the list and not inside it. -->
+       **The clear action is the page's last row.** `render.js` owns the list's `innerHTML`, so the
+       action is a one-row list of its own under it. Brand R1.1 made it a brand button for one day,
+       and Phase 1.2 put the row back. -->
   <div id="setFav" class="spage" data-title="Favorite sensors" hidden>
     <ul id="favList" class="picklist mlist"></ul>
-    <div class="btnrow"><button class="btn secondary" id="favClear">Remove all favorites</button></div>
+    <ul class="picklist mlist"><li><button class="mrow" id="favClear"
+      ><i class="glyph i i-heart_minus"></i><span class="nm">Remove all favorites</span></button></li></ul>
   </div>
 
   <!-- Sensors switched off one at a time from a station card's Details button. Drawn even when
        empty. **THIS LIST IS THE ONLY PLACE THAT NAMES A SILENCED SENSOR.** Do not delete it. -->
   <div id="setIgnored" class="spage" data-title="Ignored sensors" hidden>
     <ul id="ignoredList" class="picklist mlist"></ul>
-    <div class="btnrow"><button class="btn secondary" id="ignoredClear">Stop ignoring all</button></div>
+    <ul class="picklist mlist"><li><button class="mrow" id="ignoredClear"
+      ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
   </div>
 
   <!-- **Notifications, on the repository owner's instruction of 2026-11-04.** A subpage, opened from
-       the Alerts group. One master switch, four thresholds, and a test button under them. A
+       the Alerts group. One master switch, four thresholds, and a test row in a group of its own. A
        threshold row means "this level or worse", so a warning row turns its danger row on and locks
        it. `js/ui.js` writes every box from `PREFS.push` and never the reverse, and `js/push.js`
        mirrors the answer to the server. No markup `checked`: a preference owns these. -->
@@ -819,7 +822,8 @@
         ><label class="msw"><input type="checkbox" id="pushAnyDanger" autocomplete="off"
             aria-label="Any station at danger"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
     </ul>
-    <div class="btnrow"><button class="btn secondary" id="pushTest">Send a test</button></div>
+    <ul class="picklist mlist"><li><button class="mrow" id="pushTest"><i class="glyph i i-science"></i
+      ><span class="nm">Send a test notification</span></button></li></ul>
   </div>
 
   <!-- Every live sensor the server marks `backed: false`. `faultyPanel()` in `js/render.js` writes
@@ -863,7 +867,7 @@
   <h2 class="mdlgtitle" id="confirmTitle"></h2>
   <p class="mdlgbody" id="confirmBody"></p>
   <div class="mdlgfoot">
-    <button class="btn secondary" id="confirmNo">Cancel</button>
+    <button class="btn outlined" id="confirmNo">Cancel</button>
     <button class="btn primary" id="confirmYes"></button>
   </div>
 </dialog>
@@ -1105,8 +1109,8 @@
   </figure>
   <div class="key">
     <span data-mark="panel:head"><b>The head</b></span>
-    <span>Names the place, its district and basin, and carries one badge per sensor standing
-       there.</span>
+    <span>Names the place, its district and basin, and shows one symbol for each kind of sensor
+       there. A count such as ×2 follows a kind that stands there more than once.</span>
 
     <span class="ctl" data-mark="panel:details"><i class="i i-more_vert"></i><b>Details</b></span>
     <span>Opens the details menu of a sensor.</span>
@@ -1371,7 +1375,7 @@
       <button type="button" class="icon m3clear" data-clear="dataFind"
               aria-label="Clear the filter" hidden><i class="i i-close"></i></button>
     </div>
-    <p id="dataCount" class="muted"></p>
+    <p id="dataCount" class="subtitle"></p>
   </div>
   <div class="skelrows" aria-hidden="true">
     <i class="skel"></i><i class="skel"></i><i class="skel"></i><i class="skel"></i>
@@ -1409,7 +1413,7 @@
   <div id="camGrid"></div>
   <!-- The tally, under the thing it counts. A total belongs after the list, where a reader arrives
        at it having seen what it is totalling, rather than above one as a claim to check. -->
-  <p id="camCount" class="muted"></p>
+  <p id="camCount" class="subtitle"></p>
 </dialog>
 <!-- A regional notice or a MET Malaysia warning, read in full. The panel row and the ticker tile
      open this dialog with the same [data-banner] key, the kind and its index — see js/alerts.js
@@ -1492,10 +1496,11 @@
       <!-- The app bar's supporting text. `openSide()` fills it from the card's own region line,
            which used to stay in the body. A subtitle is what that line always was. -->
       <div id="sideSub"></div>
-      <!-- A second supporting line: one chip per sensor kind. It sat in the body under the region
-           line, which put the answer to "what is this place" below the fold on a long card. It
-           answers the same question the headline and the region line do, so it belongs in the same
-           block. M3's assist chip is the shape — see `#sideKinds` in css/chrome.css. -->
+      <!-- A second supporting line: one glyph per sensor kind, with a count where a kind repeats.
+           It sat in the body under the region line, which put the answer to "what is this place"
+           below the fold on a long card. It answers the same question the headline and the region
+           line do, so it belongs in the same block. It was a row of M3 assist chips until
+           2026-11-27 — see `#sideKinds` in css/chrome.css. -->
       <div id="sideKinds"></div>
     </div>
   </div>

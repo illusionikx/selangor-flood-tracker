@@ -636,7 +636,7 @@ function sourceInfo(s) {
    with it. */
 const region = s => {
   const bits = [[s.district, s.state].filter(Boolean).join(', '), s.basin].filter(Boolean);
-  return bits.length ? `<div class="muted">${bits.join(' · ')}</div>` : '';
+  return bits.length ? `<div class="subtitle">${bits.join(' · ')}</div>` : '';
 };
 
 /* The card's title is also the way back to its pin. The panel does not move when the map does, so a
@@ -845,9 +845,7 @@ export function popup(s) {
       ${dots(s, near, true)}
       ${goName(s)}
       ${region(s)}
-      <span class="badge" style="--c:${tone}">
-        <i class="i i-${kind.icon}"></i>${kind.one || kind.label}
-      </span>
+      ${kindRow([s])}
     </div>
     ${metSection(s)}
     ${sensorSec(s.id, `${kindGlyph(kind.icon, tone)}<b>${kind.one || kind.label}</b>`, sensorBody(s))}`;
@@ -874,17 +872,23 @@ const camFirst = members =>
    chip covering two sirens where one reports is a chip over a place that reports. It goes grey only
    where none of them does — a station with no reading must never look confident, and a station with
    one must not look dead. */
-const kindChips = members => {
+/* **A glyph per kind, not a chip, since 2026-11-27 (MIGRATION.md Phase 1.2).** The owner cut the
+   chips and kept the glyphs: `<camera> <water level> <siren> ×2 <flood gauge>`. The row carries
+   `.subtitle`, so the count is set in the subtitle face under the place line.
+   **A glyph alone names nothing to a screen reader**, so each one is `role="img"` with the kind's
+   name, and `data-tip` shows the same words on hover and on tap. `title` never opens on a phone. */
+const kindRow = members => {
   const by = new Map();
   for (const m of members) {
     const g = by.get(m.kind);
     if (g) { g.n++; g.info ||= hasInfo(m); } else by.set(m.kind, { n: 1, info: hasInfo(m) });
   }
-  return [...by].map(([kind, g]) => {
-    const k = KINDS[kind];
-    return `<span class="badge" style="--c:${g.info ? k.color : 'var(--muted)'}"
-            ><i class="i i-${k.icon}"></i>${k.one || k.label}${g.n > 1 ? ` ×${g.n}` : ''}</span>`;
-  }).join('');
+  return `<div class="kindrow subtitle">${[...by].map(([kind, g]) => {
+    const k = KINDS[kind], name = (k.one || k.label) + (g.n > 1 ? ` ×${g.n}` : '');
+    return `<span class="kg" role="img" aria-label="${name}" data-tip="${name}"
+            style="--c:${g.info ? k.color : 'var(--muted)'}"><i class="i i-${k.icon}" aria-hidden="true"></i>${
+            g.n > 1 ? `<span aria-hidden="true">×${g.n}</span>` : ''}</span>`;
+  }).join('')}</div>`;
 };
 
 export function sitePopup(members) {
@@ -905,7 +909,7 @@ export function sitePopup(members) {
       ${siteDots(lead, favIdList, favAll, hasCam ? '' : camLink(lead, nearestCam(lead)))}
       ${goName(lead)}
       ${region(lead)}
-      <div class="badges">${kindChips(members)}</div>
+      ${kindRow(members)}
     </div>
     ${metSection(lead)}
     ${camFirst(members).map(m => sensorSec(m.id, `
@@ -936,7 +940,7 @@ export function sitePopup(members) {
    reader, and out here there is none to name. Four rows reading `No water level within 10 km` state
    a gap in the feed. This states a fact about the place.
    **The head is the one `herePopup()` draws**, so the pane's app bar is filled the same way on both
-   cards — `openSide()` lifts `.popname` and the `.muted` line under it out of `.pophead`, and a card
+   cards — `openSide()` lifts `.popname` and the `.subtitle` line under it out of `.pophead`, and a card
    missing either empties that slot. The accuracy line stays: the fix is still a fix, and the radius
    is the one thing about it this app can still state.
    The glyph is `location_disabled`, which `#locate.fail` already wears. A control that cannot help
@@ -945,7 +949,7 @@ export function sitePopup(members) {
    station in trouble, and a reader outside Selangor is not one. */
 export const outsidePopup = e => `<div class="pophead">
     <div class="popname"><i class="i i-my_location" style="color:var(--me)"></i> Your Location</div>
-    <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
+    <div class="subtitle">Accurate to ${Math.round(e.accuracy)} m</div>
   </div>
   <div class="outside">
     <i class="i"></i>
@@ -1005,7 +1009,7 @@ export function herePopup(e, loaded) {
       <div class="popname"><i class="i i-my_location" style="color:var(--me)"></i> Your Location</div>
       ${/* Not `Accurate to about N m`. The figure is already a radius the browser is unsure of,
             so `about` hedges a number that is itself the hedge. */''}
-      <div class="muted">Accurate to ${Math.round(e.accuracy)} m</div>
+      <div class="subtitle">Accurate to ${Math.round(e.accuracy)} m</div>
     </div>${wxOnly
       ? `<div class="sensor"><div class="muted">No weather within ${NEAR_MAX_KM} km</div></div>`
       : `${metSection(wx && distKm(at, wx) <= NEAR_MAX_KM ? wx : null)}${
