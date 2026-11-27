@@ -749,6 +749,8 @@ order that file holds them. A trap names itself here, and the file states the ev
 - THE PLACE NAMES ARE NOT IN THE TILE PANE, SO ONE SELECTOR IS HALF A DARK THEME.
 - INVERTING A LIGHT BASEMAP AMPLIFIES A SUB-1% DETAIL INTO A 23% EDGE, AND VOYAGER HAS ONE.
 - A FILTER ON A TILE PANE COSTS ONE FRAME PER RAIL TRAVEL, AND A ZOOM CANNOT MEASURE IT.
+- LEAFLET PRUNES THE OLD ZOOM LEVEL ONCE, AND A LATE TILE KEEPS IT FOR EVER.
+- LEAFLET DROPS A `setView` WHILE A ZOOM ANIMATES, AND SAYS NOTHING.
 - `detectRetina` halves a tile on any screen above 100%, and `{r}` needs no option.
 - `requestIdleCallback` never fires under `--virtual-time-budget`, so a deferred fetch takes a...
 - The ground asks for no tile until `border.json` answers.

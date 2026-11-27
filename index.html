@@ -121,7 +121,7 @@
 <link rel="stylesheet" href="vendor/m3/tokens.css?v=2">
 <link rel="stylesheet" href="css/base.css?v=208">
 <link rel="stylesheet" href="css/chrome.css?v=346">
-<link rel="stylesheet" href="css/map.css?v=192">
+<link rel="stylesheet" href="css/map.css?v=193">
 
 <!-- The water tint stood here until 2026-08-27. It came back on 2026-09-14 for CARTO's Dark
      Matter, in js/map.js, and went again on 2026-09-15. No markup here carries it. -->
@@ -1442,6 +1442,12 @@
        scrolls them away. -->
   <div id="warnFoot"></div>
 </dialog>
+<!-- **The dark map ground's colour matrix (MIGRATION.md Phase 1.3): navy ground, green parks, blue
+     water, silver roads.** `css/map.css` appends `url(#darkground)` to the dark tile pane's filter.
+     It is inline, so there is no new file and no new line in the Content-Security-Policy. It is
+     0 by 0 and never `display: none`, which stops some browsers from using the filter inside it.
+     `sRGB` keeps the matrix in the same space as the CSS functions before it. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="darkground" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.637 0.995 -0.874 0 0.012  0.199 2.057 -1.218 0 0.033  0.341 1.474 -0.010 0 0.098  0 0 0 1 0"/></filter></svg>
 <div id="map"></div>
 <!-- Station detail, fixed to the right edge of the viewport. It was a Leaflet popup, which is
      positioned by the pin it points at: where it landed depended on the zoom, the drawer, autoPan's

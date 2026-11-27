@@ -371,8 +371,9 @@ export const inCover = ll => !cover || cover.contains(ll);
    **The map asks for no tile until border.json answers.** `cover` is `undefined` until then. The
    answer clips the levels already built and redraws both layers. A failure sets `false`, and the
    whole ground draws.
-   `_isValidTile`, `_tileCoordsToBounds` and `_onCreateLevel` are private Leaflet 1.9 methods, and
-   `_levels` is private state. Check all four on an upgrade. */
+   `_isValidTile`, `_tileCoordsToBounds`, `_onCreateLevel`, `_onOpaqueTile` and `_pruneTiles` are
+   private Leaflet 1.9 methods, and `_levels` and `_noPrune` are private state. Check each on an
+   upgrade. */
 const Ground = L.TileLayer.extend({
   _isValidTile(c) {
     if (!L.TileLayer.prototype._isValidTile.call(this, c)) return false;
@@ -380,6 +381,19 @@ const Ground = L.TileLayer.extend({
     return !!cover && cover.intersects(this._tileCoordsToBounds(c));
   },
   _onCreateLevel(level) { clipLevel(this, level); },
+  /* **A LATE TILE GETS A SECOND PRUNE.** Leaflet 1.9.4 removes the old zoom level once, 250ms after
+     the last tile of the new level loads. A tile that has not finished its fade by then keeps its
+     parents. No later pass removes them, because `_updateOpacity` prunes only for a tile that was
+     already active. A cold landing on `/station/<id>` hits this when the animation frames run late.
+     The old place names then stayed at `scale(8)` over the new ones. The opaque ground hides its own
+     old level, and the labels are transparent.
+     Leaflet calls this for each tile as it first becomes opaque, and marks the tile active right
+     after. So one deferred prune runs after the last of them. `_noPrune` is set during a zoom
+     animation, and a prune there removes tiles the animation still draws. */
+  _onOpaqueTile() {
+    clearTimeout(this._latePrune);
+    this._latePrune = setTimeout(() => { if (this._map && !this._noPrune) this._pruneTiles(); });
+  },
 });
 
 // The box in one level's own pixels: projected at that level's zoom, less that level's origin.
@@ -458,14 +472,19 @@ export const coverReady = fetch('border.json')
       for (const level of Object.values(l._levels)) clipLevel(l, level);
       l.redraw();
     }
-    setLimits();
     /* **THE LANDING VIEW FILLS THE WINDOW, and the floor still shows the whole box.** The repository
        owner asked on 2026-10-19 for no bare container on landing. `getBoundsZoom(cover, true)` is the
        lowest zoom at which the box covers the whole map card. So the reader lands on ground at every
        edge, and can still zoom out to the floor and see the strips the comment on setLimits() states.
        It runs once, here, before `findMe()` can move the view: its own wait on `coverReady` is
-       chained after this one. */
+       chained after this one.
+       **THE VIEW COMES FIRST AND THE LIMITS SECOND, since 2026-11-27.** The other order let
+       `setLimits()` start an ANIMATED zoom and pan, because the old view broke the new floor and the
+       new bounds. The `setView` after it did not stop that animation. Leaflet drops any `setView`
+       while `_animatingZoom` is set, so a fast cold landing on `/station/<id>` lost its zoom to the
+       station. A view set first is inside both limits, and `setLimits()` then moves nothing. */
     map.setView(cover.getCenter(), map.getBoundsZoom(cover, true), { animate: false });
+    setLimits();
   })
   // A failed box draws the whole ground, because a map with no ground is worse than every tile.
   .catch(() => { if (cover === undefined) { cover = false; tiles?.redraw(); labels?.redraw(); } });

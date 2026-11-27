@@ -215,6 +215,9 @@ try {
      The place names must not take it: Voyager's label halo inverts to `#090c0f`, and this slope lifts
      that to a dark blue smudge box behind every name. Copying one rule onto both panes is the exact
      revert this asserts against, and it errors nowhere.
+     **THE GROUND ALSO ENDS WITH AN SVG MATRIX SINCE 2026-11-27 (MIGRATION.md Phase 1.3).** The filter
+     it names is inline in index.html, and a missing one draws no ground at all. So the second half
+     of this block reads index.html and asks for the matrix by id.
      `setTheme` writes the reader's own preference, so the pick goes back after. */
   const { setTheme } = M;
   const { PREFS } = await import('./js/state.js');
@@ -222,9 +225,18 @@ try {
   const BASE = 'invert(1) hue-rotate(180deg)';
   const WANT = {
     light: { ground: 'none', 'place name': 'none' },
-    dark: { ground: `${BASE} brightness(2.04) contrast(1.08)`, 'place name': BASE },
+    dark: { ground: `${BASE} brightness(2.04) contrast(1.08) url("#darkground")`, 'place name': BASE },
   };
   const PANES = [['ground', '.leaflet-tile-pane'], ['place name', '.leaflet-labels-pane']];
+  {
+    const page = new DOMParser().parseFromString(await (await fetch('index.html')).text(), 'text/html');
+    const m = page.querySelector('filter#darkground > feColorMatrix');
+    ok('index.html defines the dark ground matrix', !!m && m.getAttribute('values').trim().split(/\s+/).length === 20,
+       m ? m.getAttribute('values') : 'missing');
+    ok('and the matrix runs in sRGB, the space of the chain before it',
+       page.getElementById('darkground')?.getAttribute('color-interpolation-filters') === 'sRGB', 'color-interpolation-filters');
+    ok('and its svg draws nothing', page.getElementById('darkground')?.closest('svg')?.getAttribute('width') === '0', 'width 0');
+  }
   for (const t of ['dark', 'light']) {
     setTheme(t);
     await settle(300);

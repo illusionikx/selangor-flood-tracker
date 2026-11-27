@@ -87,7 +87,25 @@ async function until(what, fn, ms = 30000) {
 }
 
 /* A fresh headless profile holds no preferences, so this states the one the picture needs. Help
-   ships light pictures only, on the repository owner's call of 2026-10-19. */
+   ships light pictures only, on the repository owner's call of 2026-10-19.
+   **A person can also open this page on a dev machine, and the app it loads shares their storage.**
+   So the page keeps the stored `prefs` first and puts them back on `pagehide`, or the favorites and
+   the ignored list are gone. The backup is in storage too, so a tab that dies before `pagehide`
+   gets them back on the next load of this page. The frame leaves first, because the app in it
+   still writes `prefs`. */
+const BACKUP = 'prefs.helpshot';
+// `null` in the backup means the key was never set.
+const restore = () => {
+  const kept = localStorage.getItem(BACKUP);
+  if (kept === null) return;
+  const was = JSON.parse(kept);
+  if (was === null) localStorage.removeItem('prefs');
+  else localStorage.setItem('prefs', was);
+  localStorage.removeItem(BACKUP);
+};
+restore();   // a backup left by a run that never reached `pagehide`
+localStorage.setItem(BACKUP, JSON.stringify(localStorage.getItem('prefs')));
+addEventListener('pagehide', () => { frame.remove(); restore(); });
 localStorage.setItem('prefs', JSON.stringify({ theme: 'light' }));
 /* Wait for the `load` event, never for `readyState`. A new frame holds an `about:blank` document that
    reads `complete` at once, and a script put into it is gone when the app replaces it. */
