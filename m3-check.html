@@ -912,6 +912,43 @@ async function desktop() {
   const { d, w, cs, r, settle } = await ready('desk');
   say('--- desktop, ' + w.innerWidth + 'x' + w.innerHeight + ' ----------------------------------');
 
+  /* **The brand's common button (MIGRATION.md Phase 5b), one assertion set for every caller.** A
+     48px target, the 12dp medium corner, Archivo in capitals drawn by CSS over sentence-case markup,
+     and a fill read off its token through a probe rather than a hex. A primary fills with
+     `--accent-fill`. A secondary fills with the inverse surface. Never a status colour. The button
+     must be on screen when this runs. */
+  const brandBtn = (id, variant) => {
+    const b = d.getElementById(id);
+    is(b.classList.contains('btn') && b.classList.contains(variant), true, id + ': is a .btn.' + variant);
+    is(Math.round(r(b).height) >= 48, true, id + ': at least 48px tall');
+    is(cs(b).borderTopLeftRadius, '12px', id + ': on the 12dp medium corner');
+    is(cs(b).textTransform, 'uppercase', id + ': in capitals, drawn by CSS');
+    is(/Archivo/.test(cs(b).fontFamily), true, id + ': in Archivo, the display face');
+    is(b.textContent.trim() === b.textContent.trim().toUpperCase(), false,
+       id + ': while the markup keeps sentence case for a screen reader');
+    const probe = d.createElement('span');
+    probe.style.color = variant === 'primary' ? 'var(--accent-fill)' : 'var(--md-sys-color-inverse-surface)';
+    b.parentNode.appendChild(probe);
+    if (!b.disabled && !b.matches(':hover'))
+      is(cs(b).backgroundColor, cs(probe).color,
+         id + ': fills with ' + (variant === 'primary' ? '--accent-fill' : 'the inverse surface'));
+    probe.remove();
+  };
+
+  /* **Brand audit R1.1.** A form control inherits the page font, so no chip or button computes the
+     browser's Arial. A prose link takes the brand ink, underlined, and never the browser's #0000EE. */
+  is(/^Roboto/.test(cs(d.querySelector('.chip')).fontFamily), true, 'fonts: a chip inherits Roboto, not Arial');
+  is(/^Roboto/.test(cs(d.getElementById('railToggle')).fontFamily), true, 'fonts: and so does a plain button');
+  {
+    const a = d.querySelector('#aboutBox a:not([class])');
+    const probe = d.createElement('span');
+    probe.style.color = 'var(--accent)';
+    d.getElementById('aboutBox').appendChild(probe);
+    is(cs(a).color, cs(probe).color, 'links: a prose link in About takes --accent');
+    is(cs(a).textDecorationLine, 'underline', 'links: and keeps its underline');
+    probe.remove();
+  }
+
   // --- motion, read BEFORE the override ---
   /* **The map card resizes on a transition, and that is the whole of the pane's arrival on screen.**
      It snapped for one revision, on the argument that animating the width makes Leaflet resize on
@@ -2143,14 +2180,14 @@ async function desktop() {
     is(trail.hasAttribute('data-tip'), true, 'settings list: its words ride data-tip, never title');
     is(trail.hasAttribute('title'), false, 'settings list: and never a title, which a phone cannot open');
 
-    /* **The clear action is the subpage's last row.** `render.js` owns the list's `innerHTML`, so
-       the action is a one-row list of its own, directly under the list. */
+    /* **The clear action is a brand button under the list, since 2026-11-27 (brand R1.1).** It was
+       a one-row list of its own. `render.js` owns the list's `innerHTML`, so the button sits in a
+       `.btnrow` beside it rather than inside it. */
     const foot = list.nextElementSibling;
-    is(foot?.contains(d.getElementById('favClear')), true, 'settings list: its action is the page’s last row');
-    is(!!d.getElementById('favClear')?.classList.contains('mrow'), true,
-       'settings list: and a row-filling action, never a link in a box of its own');
+    is(foot?.classList.contains('btnrow') && foot.contains(d.getElementById('favClear')), true,
+       'settings list: its action is a button row under the list');
+    brandBtn('favClear', 'secondary');
     is(d.querySelector('#settingsBox .rowbtns'), null, 'settings: no `.rowbtns` left in this pane');
-    is(Math.round(r(foot).top - r(list).bottom), 0, 'settings list: with no gap, since standard rows simply stack');
     // Back to the main page, where the groups below are measured.
     d.getElementById('settingsBack').click();
 
@@ -2159,8 +2196,10 @@ async function desktop() {
     const rows = [...dev.children];
     // The row's own class first: `.readout` carries the readings TABLE, which has an id of its own.
     is(rows.map(x => x.className || x.querySelector('[id]')?.id).join(','),
-       'testMode,devReadings,devForce,devRaw,devReset',
-       'developer: the reader’s own order — switch, readings, refresh, raw, reset');
+       'testMode,devReadings,devRaw',
+       'developer: the reader’s own order — switch, readings, raw, then the two buttons under it');
+    is([...dev.nextElementSibling.children].map(b2 => b2.id).join(','), 'devForce,devReset',
+       'developer: Refresh now, then Reset settings, as buttons under the list');
     /* **M3's switch.** Track 52x32 with a 2px border, thumb 16px off and 24px on, in a 48x68 target.
        The amber `.testtog` pill is gone. */
     const sw = dev.querySelector('.msw'), track = sw.querySelector('.mswtrack');
@@ -2196,14 +2235,17 @@ async function desktop() {
     is(ro.querySelector('button, a'), null, 'developer: the readings row holds no control');
     is(cs(ro).cursor, 'default', 'developer: so nothing about it invites a tap');
     is(!!ro.querySelector('#devstats'), true, 'developer: and it is where the readings table lives');
-    /* The three actions are M3 list ACTION rows: a button that fills the item. */
-    for (const id of ['devForce', 'devRaw', 'devReset']) {
-      const btn = d.getElementById(id);
-      is(btn.classList.contains('mrow'), true, id + ': is a row-filling action, not a pill');
+    /* Raw payload is a link, so it stays an M3 list ACTION row. The two buttons are brand buttons,
+       and neither is a primary, because Settings has no one main act (MIGRATION.md Phase 5b). */
+    {
+      const btn = d.getElementById('devRaw');
+      is(btn.classList.contains('mrow'), true, 'devRaw: is a row-filling action, not a pill');
       is(Math.round(r(btn).width), Math.round(r(btn.closest('li')).width),
-         id + ': and fills its own container, so the row is the target');
-      is(cs(btn).cursor, 'pointer', id + ': which a pressable row states');
+         'devRaw: and fills its own container, so the row is the target');
+      is(cs(btn).cursor, 'pointer', 'devRaw: which a pressable row states');
     }
+    for (const id of ['devForce', 'devReset']) brandBtn(id, 'secondary');
+    is(sb.querySelector('.btn.primary'), null, 'settings: no primary button, since no act here is the main one');
 
     /* --- Notifications, on the repository owner's instruction of 2026-11-04 ---
        A subpage, opened by one row of the Alerts group. One master, four thresholds, then a test row,
@@ -2220,15 +2262,15 @@ async function desktop() {
     is(pl.hidden, false, 'notifications: the subpage shows');
     is(d.getElementById('settingsTitle').textContent, 'Notifications', 'notifications: under its own title');
     is([...pl.querySelectorAll('li')].map(x => x.querySelector('input, button')?.id).join(','),
-       'pushOn,pushFavWarn,pushFavDanger,pushAnyWarn,pushAnyDanger,pushTest',
-       'notifications: master, four thresholds, then the test row');
-    is([...pl.querySelectorAll('ul')].map(u => u.children.length).join(','), '1,4,1',
-       'notifications: in three groups, so the master and the test stand apart from the thresholds');
+       'pushOn,pushFavWarn,pushFavDanger,pushAnyWarn,pushAnyDanger',
+       'notifications: master, then four thresholds');
+    is([...pl.querySelectorAll('ul')].map(u => u.children.length).join(','), '1,4',
+       'notifications: in two groups, so the master stands apart from the thresholds');
     is(pl.querySelectorAll('.msw').length, 5, 'notifications: five M3 switches');
-    is(d.getElementById('pushTest').closest('li').querySelector('.msw'), null,
-       'notifications: the test row is an action and holds no switch');
-    is(d.getElementById('pushTest').classList.contains('mrow'), true,
-       'notifications: the test row is a row-filling action');
+    is(pl.lastElementChild.classList.contains('btnrow')
+       && pl.lastElementChild.contains(d.getElementById('pushTest')), true,
+       'notifications: the test is a button under the last group');
+    brandBtn('pushTest', 'secondary');
     is(['pushOn', 'pushFavWarn', 'pushFavDanger', 'pushAnyWarn', 'pushAnyDanger']
          .every(id => d.getElementById(id).checked === false), true,
        'notifications: all five default to off, so nothing can be on at install');
@@ -2291,6 +2333,15 @@ async function desktop() {
     is(cs(foot).gap, '8px', 'reset: at M3’s 8px between them');
     is([...foot.children].map(b2 => b2.id).join(','), 'confirmNo,confirmYes',
        'reset: Cancel first, the destructive answer last, which is M3’s order');
+    /* **Brand buttons since 2026-11-27 (R1.1).** Cancel is the secondary and the act is the one
+       primary. A destructive act stays volt and never takes a status red. */
+    brandBtn('confirmNo', 'secondary');
+    brandBtn('confirmYes', 'primary');
+    is(Math.round(r(d.getElementById('confirmNo')).top), Math.round(r(d.getElementById('confirmYes')).top),
+       'reset: the two buttons stay on one line');
+    // The splash is gone by now, so its button is asserted as markup alone.
+    is(d.getElementById('splashRetry').className, 'btn primary', 'splash: Try again is the card’s one primary');
+    is(d.querySelector('.mtext, .tbtn, .link'), null, 'buttons: no `.mtext`, `.tbtn` or `.link` left');
     is(cs(cb.querySelector('.mdlgtitle')).fontSize,
        cs(d.documentElement).getPropertyValue('--md-sys-typescale-headline-small-size').trim(),
        'reset: the headline at headline-small');

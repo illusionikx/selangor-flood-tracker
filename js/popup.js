@@ -211,7 +211,7 @@ const metric = (k, v, cls = '') => `<div class="k muted">${k}</div><div class="v
    A rate of exactly zero gets no arrow at all; "steady" is not a direction. */
 export const rateHtml = s => s.rate == null ? '' : !s.rate
   ? '<b class="rate">steady</b>'
-  : `<b class="rate ${s.rate > 0 ? 'up' : 'down'}"><i class="i i-arrow_${
+  : `<b class="rate num ${s.rate > 0 ? 'up' : 'down'}"><i class="i i-arrow_${
       s.rate > 0 ? 'upward' : 'downward'}"></i>${Math.abs(s.rate)} m/h</b>`;
 
 /* Hours until this station hits its own danger mark at the rate it is climbing now. Deliberately
@@ -333,15 +333,15 @@ export function meter(s) {
     `<i class="tick" style="left:${p}%" data-tip="${i ? 'warning' : 'alert'} ${v} m"></i>`).join('');
   const names = ['alert', 'warning', 'danger'].slice(-stops.length + 1);
   const labels = stops.slice(1).map(([v, p], i) =>
-    `<span style="left:${p}%"><b>${v}</b>${names[i]}</span>`).join('');
+    `<span style="left:${p}%"><b class="num">${v}</b>${names[i]}</span>`).join('');
 
   return `<div class="meter">
     <div class="mtop">
-      <b style="color:${col}">${s.level} m</b>
+      <b class="num" style="color:${col}">${s.level} m</b>
       ${/* No `(3.50 m)` after the percentage. `max` is the danger mark, and `.mscale` below draws
             that same number as `3.50 danger` about 20px lower — one number twice, and the lower one
             is the one standing on the scale it belongs to. */''}
-      <span class="muted">${(s.level / max * 100).toFixed(0)}% of danger</span>
+      <span class="muted"><span class="num">${(s.level / max * 100).toFixed(0)}%</span> of danger</span>
     </div>
     <div class="track">
       <span class="fill" style="width:${scalePos(s.level, stops).toFixed(1)}%;background:${col}"></span>
@@ -396,21 +396,22 @@ function gaugeBlock(s) {
     ${stuck && !stale ? `<div class="muted">Faulty signal. ${faultWhy(s)}</div>` : ''}
     <div class="meter">
       ${wet ? `<div class="mtop">
-          <b style="color:${stale ? 'var(--muted)' : col}">${s.depth} m of water</b>
+          <b style="color:${stale ? 'var(--muted)' : col}"><span class="num">${s.depth} m</span> of water</b>
         </div>
         <div class="track">
           <span class="fill" style="width:${pct.toFixed(1)}%;background:${stale ? 'var(--muted)' : col}"></span>
           <i class="tick" style="left:68%"></i>
         </div>
         <div class="mscale muted">
-          <span style="left:68%">warning ${s.warning}</span><span style="left:100%">danger ${s.danger}</span>
+          <span style="left:68%"><b class="num">${s.warning}</b>warning</span><span style="left:100%"
+            ><b class="num">${s.danger}</b>danger</span>
         </div>`
         /* The block above already says DRY GROUND, and the section is headed Flood gauge, so
            "water is" and "the gauge marker" restated two things the reader had just read. The depth
            and what it is measured from are all that is left to say. A plain comment and not the
            `${...''}` form the templates above use — this sits between the two arms of a ternary,
            which is expression context and not a template. */
-        : `<div class="muted">${s.depth < 0 ? `${Math.abs(s.depth)} m below the marker`
+        : `<div class="muted">${s.depth < 0 ? `<span class="num">${Math.abs(s.depth)} m</span> below the marker`
                                             : 'Level with the marker'}</div>`}
     </div>`;
 }
@@ -474,8 +475,8 @@ export function trendBlock(s) {
   const unit = v => s.kind === 'rainfall' ? `${v} mm/h` : `${v.toFixed(2)} m`;
   // One row for the pair, on a reader's instruction of 2026-10-14. The unit goes once, at the end.
   if (wv.length && s.kind === 'river') rows.push(metric('Min / Max',
-    `${Math.min(...wv).toFixed(2)} / ${unit(Math.max(...wv))}`));
-  else if (wv.length) rows.push(metric('Max', unit(Math.max(...wv))));
+    `${Math.min(...wv).toFixed(2)} / ${unit(Math.max(...wv))}`, 'num'));
+  else if (wv.length) rows.push(metric('Max', unit(Math.max(...wv)), 'num'));
   // The number the "rising" flag is actually a cutoff on. Shown whenever it is climbing, flagged or
   // not, so "not rising" can be read as "still hours away" rather than taken on trust.
   if (s.kind === 'river' && s.eta != null) rows.push(metric('Reaches danger',
@@ -484,7 +485,8 @@ export function trendBlock(s) {
      A siren sounding on this poll is `Now`, whatever the database held when the payload was built.
      An out-of-contact siren still gets the row: when it last sounded is a fact about the place. */
   if (s.kind === 'siren') rows.push(metric('Last triggered',
-    hasInfo(s) && s.status > 0 ? 'Now' : s.lastOn ? stamp(s.lastOn * 1000) : 'None in 30 days'));
+    hasInfo(s) && s.status > 0 ? 'Now'
+      : s.lastOn ? `<span class="num">${stamp(s.lastOn * 1000)}</span>` : 'None in 30 days'));
 
   /* No `Last hour` or `Today` row. The totals chart carries both. Two surfaces for one number is how
      the card and the chart came to disagree once already — see the test-mode note in FEATURES.md. */
@@ -750,7 +752,8 @@ export const wxItem = (icon, tone, head, sub, trail = '') =>
     </li>`;
 
 /* The supporting line: the clock in the panel's stack, and the span on this card. */
-export const wxWhen = t => `<span class="wxwhen">${t}</span>`;
+// A bare clock is a timestamp and takes the mono face. `Until 19:30` holds a word and stays Roboto.
+export const wxWhen = t => `<span class="wxwhen${/^\d{1,2}:\d{2}$/.test(t) ? ' num' : ''}">${t}</span>`;
 
 /* The supporting line for the reading happening NOW. A play arrow and the word, in the accent and
    in bold, standing where the clock stands. A supporting line answers which moment the row states,
@@ -767,9 +770,9 @@ export const WX_NOW =
    The order is the MARKUP's and never a `column-reverse`, so a screen reader hears what the eye
    reads. */
 export const wxTemps = (tmax, tmin) => `<div class="wxtemps">
-      <span class="wxt hi" aria-label="High ${tmax} degrees">
+      <span class="wxt num hi" aria-label="High ${tmax} degrees">
         <i class="i i-arrow_upward" aria-hidden="true"></i>${tmax}°</span>
-      <span class="wxt lo" aria-label="Low ${tmin} degrees">
+      <span class="wxt num lo" aria-label="Low ${tmin} degrees">
         <i class="i i-arrow_downward" aria-hidden="true"></i>${tmin}°</span>
     </div>`;
 
@@ -1071,8 +1074,8 @@ function timeAxis(points, frame) {
    8% of a 300px panel is 24px, and a label is about 34px wide — so a tick inside that band cannot be
    centred without crossing the edge, and outside it always can. */
 const axisHtml = ticks => `<div class="axis muted" aria-hidden="true">${ticks.map(t =>
-  `<span style="left:${t.x}%;transform:translateX(${t.x < 8 ? 0 : t.x > 92 ? -100 : -50}%)"
-    >${t.at}</span>`).join('')}</div>`;
+  `<span${t.now ? '' : ' class="num"'} style="left:${t.x}%;transform:translateX(${
+    t.x < 8 ? 0 : t.x > 92 ? -100 : -50}%)">${t.at}</span>`).join('')}</div>`;
 
 const rules = ticks => ticks.filter(t => !t.now).map(t =>
   `<line x1="${t.x}" x2="${t.x}" y1="0" y2="28" vector-effect="non-scaling-stroke"/>`).join('');
@@ -1284,7 +1287,7 @@ export function sparkline(points, kind = 'river', st = null, win = 0) {
     ${peak}
     ${axisHtml(ticks)}
     ${inWin.length > 1 && !win   // the card states Min and Max as rows above the graph
-      ? `<div class="muted">${lo0.toFixed(2)}–${hi0.toFixed(2)} m</div>` : ''}
+      ? `<div class="muted num">${lo0.toFixed(2)}–${hi0.toFixed(2)} m</div>` : ''}
   </div>`;
 }
 
@@ -1552,7 +1555,7 @@ export function rainAcc(acc, from, head = true) {
        to add — it already says the measurement fell short, and by how much. The clock time it
        started at answers nothing a reader asked. */
     const tip = `${label} · ${mm} mm${span ? ` · measured over ${span} h` : ''}`;
-    return `<div class="acccol" data-tip="${tip}"><b>${mm}<small> mm</small></b><i style="height:${
+    return `<div class="acccol" data-tip="${tip}"><b class="num">${mm}<small> mm</small></b><i style="height:${
       (mm / hi * 100).toFixed(1)}%"></i></div>`;
   };
 
@@ -1565,7 +1568,8 @@ export function rainAcc(acc, from, head = true) {
           passes down by inheritance and drew `24 h` and `72 h` larger than their three neighbours.
           The em dash over the column is what says the window has no answer. */''}
     <div class="accx">${rows.map(([, label, r]) =>
-      `<span>${label}${r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
+      `<span${/\d/.test(label) ? ' class="num"' : ''}>${label}${
+        r && r[1] ? `<sup>${'*'.repeat(r[1])}</sup>` : ''}</span>`).join('')}</div>
     ${star ? '<div class="muted">* Derived from archived readings.</div>' : ''}
     ${/* One sentence, and no clock time. The shortfall is the claim the mark makes, and the hour the
           records start at is a fact about this server rather than about rain. Both long windows carry

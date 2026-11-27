@@ -556,6 +556,12 @@
 }
 
 * { box-sizing: border-box; }
+/* **A form control does not inherit the page's font, and this rule makes it.** The browser's own
+   sheet gives `button`, `input`, `select` and `textarea` a system font of their own. Before this
+   rule every button and chip in this app computed Arial at 13.33px, under a body set in Roboto.
+   A class that states its own `font` or `font-family` still wins, because this selector is one
+   element deep. (Brand audit R1.1, 2026-11-27.) */
+button, input, select, textarea { font: inherit; }
 body {
   margin: 0; font: 400 14px/1.5 Roboto, system-ui, sans-serif;
   background: var(--surface); color: var(--on-surface);
@@ -832,14 +838,95 @@ dialog:focus, dialog:focus-visible { outline: none; }
 }
 .icon:hover { background: var(--hover); }
 
-.link {
-  display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 10px;
-  font: 500 12px/1.3 Roboto, sans-serif; text-align: left; cursor: pointer;
-  color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 0; border-radius: 8px;
+/* **The brand's common button, from `branding/tokens/brand.css` (MIGRATION.md Phase 5b).** Three
+   variants replace the ad-hoc `.link`, `.mtext` and `.tbtn`. `.btn.primary` is the ONE main act on a
+   surface, `.btn.secondary` is a second act beside it, and `.btn.text` is a low-stakes act.
+   **Two rules hold it, and the second is the colour language.** One primary per surface, so two volt
+   buttons never stand side by side. A button never takes a status colour, so a destructive confirm
+   stays volt and names the act.
+   **The capitals are CSS alone.** The markup keeps sentence case, because a screen reader reads the
+   words and a capitalised string reads as shouting. This is one of the ALL-CAPS exceptions in
+   CLAUDE.md's writing standard.
+   **48px tall, against M3's 40.** The touch target is the brand's call, and it meets M3's own 48dp
+   target with no `::after` to grow it.
+   **Icon buttons, chips, menu items, list rows, the rail, the navigation bar, the seek bar and the
+   FABs are not this.** They keep their M3 shapes and Roboto. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 24px; border: 0; border-radius: var(--md-sys-shape-corner-medium);
+  cursor: pointer;
+  font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 13px;
+  line-height: 1.2; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap;
 }
-.link:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
-.link .i { font-size: 16px; }
+/* `display: inline-flex` beats the browser's own `[hidden]` rule, so it has to be said again.
+   `#devForce` hides on the Pages build through that attribute. */
+.btn[hidden] { display: none; }
+.btn .i { font-size: 18px; }
+/* The state layer is the label colour mixed into the fill, at M3's own hover and press opacities. */
+.btn.primary { background: var(--accent-fill); color: var(--on-accent-fill); }
+.btn.primary:hover {
+  background: color-mix(in srgb, var(--on-accent-fill) var(--m3-state-hover), var(--accent-fill));
+}
+.btn.primary:active {
+  background: color-mix(in srgb, var(--on-accent-fill) var(--m3-state-press), var(--accent-fill));
+}
+.btn.secondary {
+  background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface);
+}
+.btn.secondary:hover {
+  background: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) var(--m3-state-hover),
+    var(--md-sys-color-inverse-surface));
+}
+.btn.secondary:active {
+  background: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) var(--m3-state-press),
+    var(--md-sys-color-inverse-surface));
+}
+.btn.text {
+  background: none; color: var(--md-sys-color-on-surface);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.btn.text:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--m3-state-hover), transparent);
+}
+.btn.text:active {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) var(--m3-state-press), transparent);
+}
+.btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
+/* M3's disabled pair: the label at 38% and the container at 12% of `on-surface`. */
+.btn:disabled, .btn:disabled:hover, .btn:disabled:active {
+  cursor: default; color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+}
+.btn.text:disabled { background: none; }
+/* A Settings action under a list: full width below 600px, at the list's own leading edge above. */
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+@media (max-width: 600px) { .btnrow { flex-direction: column; } .btnrow .btn { width: 100%; } }
+
+/* **A reading is set in JetBrains Mono with tabular figures (MIGRATION.md Phase 6, brand R1.1).**
+   That covers a reading, a threshold, a rain total, a temperature, a clock stamp and a graph axis
+   label. Names and words stay in Roboto. Tabular figures give every digit one width, so a column of
+   levels lines up and a live number does not shift its neighbours when it changes.
+   **`.num` is the hook, and the JS writes it.** Most readings share an element with words, such as
+   `41% of danger` or `flooded · 0.12 m`. No selector can split a text node, so the template wraps
+   the figure in `<span class="num">` and leaves the words outside it. The selectors after `.num`
+   name elements that hold a figure and nothing else.
+   **The unit goes with the figure.** `1.74 m` is one token to a reader, and a unit in a second face
+   reads as a typo.
+   **Not covered: the camera stamps.** `.btime`, `.abtime`, `.tlpeek` and `.clipcap` mix weekday and
+   month names into the stamp, and `js/timeline.js` measures the pill's width in Roboto.
+   `.sparktip.num` needs both classes, because `.sparktip` sets `font` with the shorthand. */
+.num, .sparktip.num, .ntime,
+table.data .cv .val b, table.data .cv .line b, table.data .gline .pc, .tipbox .tv b {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+
+/* **A link in running prose takes the brand ink, underlined, on both themes.** The browser's own
+   blue (#0000EE, and #9E9EFF on the dark theme) was the last default colour on screen. `--accent` is
+   the ink token, so this reads 6.98:1 on paper and 6.77:1 on the dark surface. A link that is a
+   control (`.mrow`, `.btn`) keeps its own colour. */
+:is(.docbox, #warnBox) a:not(.mrow, .btn) {
+  color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
+}
 
 /* --- shared blocks (popup + alert panel) ---------------------------------------------------- */
 

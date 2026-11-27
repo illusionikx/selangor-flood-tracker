@@ -218,9 +218,10 @@ document.addEventListener('poll', () => { if (settingsBox.open) paintDev(); });
 
 /* Refresh now exists only where there is something to refresh. The Pages build serves a baked
    api.json written by a cron job, so a force there is a 404 against a file that has no opinion.
-   **The row hides, never the button.** These are segmented list items, so a hidden button leaves an
-   empty container in the middle of the group, which draws as a gap rather than as nothing. */
-if (STATIC) el('devForce').closest('li').hidden = true;
+   **The button hides itself, since 2026-11-27.** It was a row in a segmented list, and a hidden
+   button there left an empty container in the group, so the `<li>` hid instead. It is a `.btn` under
+   the list now, with no container to leave behind. */
+if (STATIC) el('devForce').hidden = true;
 
 el('devRaw').href = FEED;
 

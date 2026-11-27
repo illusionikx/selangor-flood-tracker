@@ -161,9 +161,12 @@ export function ticker() {
          `at danger` with no number, over a sensor that is not at a danger mark of any kind.
          JPS's own two words, the same split ALERT_TITLE draws in the panel. The tier colour beside
          this carries the rest: `t-heavy` is amber and `t-now` is red. */
-      : s.kind === 'rainfall'      ? `${s.status >= 4 ? 'very heavy' : 'heavy'} rain · ${s.hourly} mm/h`
-      : s.kind === 'gauge'         ? `flooded · ${s.depth} m`
-      : s.status >= 3              ? `at danger${s.level != null ? ` · ${s.level.toFixed(2)} m` : ''}`
+      // A reading takes the mono face and its words stay in the UI face (brand R1.1, Phase 6).
+      : s.kind === 'rainfall'      ? `${s.status >= 4 ? 'very heavy' : 'heavy'} rain · <span class="num">${
+                                       s.hourly} mm/h</span>`
+      : s.kind === 'gauge'         ? `flooded · <span class="num">${s.depth} m</span>`
+      : s.status >= 3              ? `at danger${s.level != null
+                                       ? ` · <span class="num">${s.level.toFixed(2)} m</span>` : ''}`
       : `reaches danger ${s.eta != null && s.eta < 1 ? 'within the hour' : `in ~${s.eta} h`}`;
     return `<button class="tk-i" data-go="${s.id}" tabindex="-1">
       <i class="i i-${KINDS[s.kind].icon}" style="--c:${KINDS[s.kind].color}"></i>

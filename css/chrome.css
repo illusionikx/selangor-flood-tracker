@@ -1463,18 +1463,10 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
   line-height: var(--md-sys-typescale-body-medium-line-height);
   letter-spacing: var(--md-sys-typescale-body-medium-tracking);
 }
+/* The footer holds `#confirmNo` (`.btn.secondary`) and `#confirmYes` (`.btn.primary`), Cancel first.
+   It stays on one line at every width, which MIGRATION.md Phase 5b states for a dialog footer. The
+   verb is short, so two buttons fit 312px. `.mtext`, M3's 40px text button, is gone. */
 .mdlgfoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
-/* M3's text button: 40px tall, corner-full, a `primary` label, 12px of inline padding. */
-.mtext {
-  min-height: 40px; padding: 0 12px; border: 0; border-radius: 20px; cursor: pointer;
-  background: none; color: var(--md-sys-color-primary);
-  font-size: var(--md-sys-typescale-label-large-size);
-  line-height: var(--md-sys-typescale-label-large-line-height);
-  font-weight: var(--md-sys-typescale-label-large-weight);
-  letter-spacing: var(--md-sys-typescale-label-large-tracking);
-}
-.mtext:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.mtext:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-off); }
 
 /* --- all-stations table ----------------------------------------------------------------------- */
 
@@ -1566,7 +1558,7 @@ body.railopen.kbmode #rail .railfab[data-key]::after { margin-inline-start: 12px
 }
 #dataBox .m3search .m3clear, #camBox .m3search .m3clear { flex: none; font-size: 20px; }
 /* `display: flex` on `.icon` beats the browser's own `[hidden]` rule, so it has to be said again.
-   This is the third element in this app to need the restatement — `.link` and `.camwarn` carry it
+   This is the third element in this app to need the restatement — `.btn` and `.camwarn` carry it
    too. */
 #dataBox .m3search .m3clear[hidden], #camBox .m3search .m3clear[hidden] { display: none; }
 
@@ -2253,7 +2245,7 @@ table.data .dash { color: var(--outline); }
   object-fit: fill;
 }
 /* `display: block` above beats the browser's own `[hidden]` rule, so it has to be said again. The
-   filter in js/ui.js sets `hidden`, and `.link` and `.camwarn` both carry the same restatement. */
+   filter in js/ui.js sets `hidden`, and `.btn` and `.camwarn` both carry the same restatement. */
 .camtile[hidden] { display: none; }
 
 /* The skeleton: a shimmer over the tile's own idle fill (`var(--hover)`, already `.camtile`'s own
@@ -3475,21 +3467,10 @@ body.side #side { display: flex; }
 .apane details > summary.nsub b { color: var(--md-sys-color-on-surface-variant); }
 @media (prefers-reduced-motion: reduce) { .apane .chev { transition: none; } }
 
-/* The one button over every section: M3's TEXT button. `label-large` in `primary`, 40dp tall, a full
-   corner, and 12dp of padding that drops to 16 on the side the icon leads. */
+/* The one button over every section is the brand's `.btn.text` (MIGRATION.md Phase 5b). It was
+   `.tbtn`, M3's 40dp text button in `primary`. It is a text button and not a primary, because it
+   folds or opens the list and changes no data. */
 .abulk { display: flex; justify-content: flex-end; margin: 4px 0; }
-.tbtn {
-  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 16px;
-  border: 0; border-radius: var(--md-sys-shape-corner-full); background: none; cursor: pointer;
-  color: var(--md-sys-color-primary); font-family: inherit;
-  font-size: var(--md-sys-typescale-label-large-size);
-  line-height: var(--md-sys-typescale-label-large-line-height);
-  font-weight: var(--md-sys-typescale-label-large-weight);
-  letter-spacing: var(--md-sys-typescale-label-large-tracking);
-}
-.tbtn .i { font-size: 18px; }
-.tbtn:hover { background: color-mix(in srgb, var(--md-sys-color-primary) var(--m3-state-hover), transparent); }
-.tbtn:active { background: color-mix(in srgb, var(--md-sys-color-primary) var(--m3-state-press), transparent); }
 
 /* --- notices, as an email list -------------------------------------------------------------------
 
@@ -4161,12 +4142,14 @@ body.side #side { display: flex; }
 #splashWarn {
   max-width: 320px; padding: 16px 20px; border-radius: 12px; color-scheme: light;
   --surface: #fff; --on-surface: #1f1f1f; --muted: #5f6368; --outline: #dadce0; --accent: var(--brand-volt);
+  --accent-fill: var(--brand-volt);
   background: var(--surface); color: var(--on-surface);
 }
 #splashWarn .state { display: flex; align-items: center; justify-content: center; gap: 8px; }
 #splashWarn .state .i { font-size: 20px; }
 #splashWarn p { margin: 12px 0; font-size: 12px; line-height: 1.6; text-align: left; }
-#splashWarn .link { justify-content: center; font-size: 13px; padding: 10px; }
+/* "Try again" is the card's one act, so it is the primary, and it sits on white and never on volt. */
+#splashWarn .btn { width: 100%; }
 @media (prefers-reduced-motion: reduce) { #splash .spin { animation-duration: 2.4s; } }
 
 /* --- the egg ---------------------------------------------------------------------------------- */

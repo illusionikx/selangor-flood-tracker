@@ -271,7 +271,7 @@
     <p class="muted">This page needs live water levels, rainfall and sirens from JPS. It shows no
        map without them, because during a flood an old reading is worse than none. It tries again
        by itself.</p>
-    <button class="link" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
+    <button class="btn primary" id="splashRetry"><i class="i i-refresh"></i> Try again</button>
   </div>
 </div>
 <!-- **The app bar, below 600px only.** Above that the rail runs the full height and nothing stands
@@ -740,7 +740,7 @@
   </ul>
 
   <!-- **The developer controls, as one segmented list.** The order is a reader's own, 2026-08-25:
-       the switch, then the readings, then the three actions.
+       the switch, then the readings, then Raw payload, then two buttons under the list.
        **The readings are a row of the same list and take no press.** `.readout` carries the table
        rather than a headline, so the group reads as one block and nothing about it invites a tap.
        **`#devForce` hides on the Pages build**, and `js/ui.js` hides its `<li>`. Hiding the button
@@ -757,37 +757,39 @@
     <!-- The readings table moved to a subpage on the repository owner's instruction of 2026-10-15. -->
     <li><button class="mrow" id="devReadings" data-page="setReadings"><i class="glyph" aria-hidden="true"></i
       ><span class="nm">Readings</span><i class="i i-expand_more mgo" aria-hidden="true"></i></button></li>
-    <li><button class="mrow" id="devForce"><i class="glyph i i-refresh"></i
-      ><span class="nm">Refresh now</span></button></li>
     <li><a class="mrow" id="devRaw" href="api.php" target="_blank" rel="noopener"
       ><i class="glyph i i-open_in_new"></i><span class="nm">Raw payload</span></a></li>
-    <li><button class="mrow" id="devReset"><i class="glyph i i-restart_alt"></i
-      ><span class="nm">Reset settings</span></button></li>
   </ul>
+  <!-- **The two developer acts are brand buttons under the list, since 2026-11-27 (brand R1.1).**
+       They were list action rows. Raw payload stays a row, because it is a link and not a button.
+       Neither is a primary: Settings has no one main act. `#devForce` hides itself on the Pages
+       build, and `.btn[hidden]` makes that work. -->
+  <div class="btnrow">
+    <button class="btn secondary" id="devForce">Refresh now</button>
+    <button class="btn secondary" id="devReset">Reset settings</button>
+  </div>
   </div><!-- /#setMain -->
 
   <!-- Sensors starred from a station card. Listed one row per sensor, not one row per site: the
        search box groups by site because it matches the map, and this panel manages the saved list
        itself, so it has to show every id the list holds. A reader who starred one gauge of six
        needs to see which one.
-       **The clear action is the page's last row.** `render.js` owns the list's `innerHTML`, so the
-       action is a one-row list of its own under it. -->
+       **The clear action is a brand button under the list, since 2026-11-27.** `render.js` owns the
+       list's `innerHTML`, so the button sits in a `.btnrow` beside the list and not inside it. -->
   <div id="setFav" class="spage" data-title="Favorite sensors" hidden>
     <ul id="favList" class="picklist mlist"></ul>
-    <ul class="picklist mlist"><li><button class="mrow" id="favClear"
-      ><i class="glyph i i-heart_minus"></i><span class="nm">Remove all favorites</span></button></li></ul>
+    <div class="btnrow"><button class="btn secondary" id="favClear">Remove all favorites</button></div>
   </div>
 
   <!-- Sensors switched off one at a time from a station card's Details button. Drawn even when
        empty. **THIS LIST IS THE ONLY PLACE THAT NAMES A SILENCED SENSOR.** Do not delete it. -->
   <div id="setIgnored" class="spage" data-title="Ignored sensors" hidden>
     <ul id="ignoredList" class="picklist mlist"></ul>
-    <ul class="picklist mlist"><li><button class="mrow" id="ignoredClear"
-      ><i class="glyph i i-visibility"></i><span class="nm">Stop ignoring all</span></button></li></ul>
+    <div class="btnrow"><button class="btn secondary" id="ignoredClear">Stop ignoring all</button></div>
   </div>
 
   <!-- **Notifications, on the repository owner's instruction of 2026-11-04.** A subpage, opened from
-       the Alerts group. One master switch, four thresholds, and a test row in a group of its own. A
+       the Alerts group. One master switch, four thresholds, and a test button under them. A
        threshold row means "this level or worse", so a warning row turns its danger row on and locks
        it. `js/ui.js` writes every box from `PREFS.push` and never the reverse, and `js/push.js`
        mirrors the answer to the server. No markup `checked`: a preference owns these. -->
@@ -817,8 +819,7 @@
         ><label class="msw"><input type="checkbox" id="pushAnyDanger" autocomplete="off"
             aria-label="Any station at danger"><span class="mswtrack"><span class="mswthumb"></span></span></label></li>
     </ul>
-    <ul class="picklist mlist"><li><button class="mrow" id="pushTest"><i class="glyph i i-science"></i
-      ><span class="nm">Send a test notification</span></button></li></ul>
+    <div class="btnrow"><button class="btn secondary" id="pushTest">Send a test</button></div>
   </div>
 
   <!-- Every live sensor the server marks `backed: false`. `faultyPanel()` in `js/render.js` writes
@@ -862,8 +863,8 @@
   <h2 class="mdlgtitle" id="confirmTitle"></h2>
   <p class="mdlgbody" id="confirmBody"></p>
   <div class="mdlgfoot">
-    <button class="mtext" id="confirmNo">Cancel</button>
-    <button class="mtext" id="confirmYes"></button>
+    <button class="btn secondary" id="confirmNo">Cancel</button>
+    <button class="btn primary" id="confirmYes"></button>
   </div>
 </dialog>
 <!-- **M3's snackbar, and it is a `popover` for one reason.** It reports on a control inside a modal
