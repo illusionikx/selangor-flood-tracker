@@ -768,20 +768,21 @@ export function openSide(key, html, mastAt) {
     ...(head ? head.querySelectorAll(':scope > .near, :scope > .fav, :scope > .dots, :scope > .menu') : []));
   /* **The region line is the app bar's supporting text.** `#sideHead` is M3's medium flexible top
      app bar now, and that component states a headline over an optional line under it. The card's
-     own muted line is what that has always been: `Shah Alam, Selangor` under a station name, the
+     own `.subtitle` line is what that has always been: `Shah Alam, Selangor` under a station name, the
      accuracy radius under "Your Location", the point and its distance under a weather place.
-     `:scope > .muted` and not `.muted`, because the alert list writes `· nearest first` INSIDE its
-     `.popname`. A descendant search lifts that fragment out of the title it belongs to. */
-  el('sideSub').replaceChildren(...[head?.querySelector(':scope > .muted')].filter(Boolean));
+     `:scope >` and not a descendant search, because the alert list once wrote `· nearest first`
+     INSIDE its `.popname`. A descendant search lifts such a fragment out of the title it belongs to.
+     The line was `.muted` until 2026-11-27, and `.subtitle` since (MIGRATION.md Phase 1.2). */
+  el('sideSub').replaceChildren(...[head?.querySelector(':scope > .subtitle')].filter(Boolean));
   /* **The kind chips are the app bar's second supporting line.** They stayed in the body on the
      argument that M3 puts supporting content there — which is the side SHEET's rule, and this
      header stopped being one. What they answer is `what is this place`, the same question the
      headline and the region line answer, so the three read as one block. On a five-sensor mast they
      used to sit under a region line the reader scrolled away from.
-     A single-sensor card emits one bare `.badge` and a mast emits a `.badges` box, so both are
-     named. */
+     Since 2026-11-27 the line is a `.kindrow` of glyphs, and the chips are gone. Every card emits
+     one row, a single sensor included. */
   el('sideKinds').replaceChildren(
-    ...(head ? head.querySelectorAll(':scope > .badge, :scope > .badges') : []));
+    ...(head ? head.querySelectorAll(':scope > .kindrow') : []));
   /* Every card now puts nothing else in `.pophead`, so the split empties it. An empty seam
      still draws its own bottom margin, which is 16px of nothing over the first reading. `:empty`
      cannot see this: the template leaves whitespace text nodes behind. */

@@ -75,6 +75,36 @@ const is = (got, want, name) => {
   if (!ok) bad++;
   say((ok ? 'ok   ' : 'FAIL ') + name + '  -> ' + JSON.stringify(got) + (ok ? '' : '  want ' + JSON.stringify(want)));
 };
+/* **Every page and dialog title is in the brand face (MIGRATION.md Phase 1.2).** Archivo Expanded
+   800, capitals drawn by CSS over the markup's own case, tracked .02em, and free to wrap. */
+const titleFace = (h, name) => {
+  const c = h.ownerDocument.defaultView.getComputedStyle(h);
+  is(/^"?Archivo/.test(c.fontFamily), true, name + ': title in Archivo, the display face');
+  is(c.fontWeight, '800', name + ': at weight 800');
+  is(c.textTransform, 'uppercase', name + ': in capitals, drawn by CSS');
+  is(Math.abs(parseFloat(c.letterSpacing) - parseFloat(c.fontSize) * 0.02) < 0.05, true,
+     name + ': tracked .02em');
+  is(c.whiteSpace === 'normal' && c.textOverflow !== 'ellipsis', true, name + ': wraps and never ellipsises');
+};
+/* **The line under a title is the brand `.subtitle` (MIGRATION.md Phase 1.2).** JetBrains Mono 500
+   at 12px, tracked .08em, in capitals drawn by CSS, in `--muted`. The size is read back on purpose:
+   `.muted` states 12px too, and an id rule that restates a size beats the class. */
+const subtitleFace = (s, name) => {
+  const win = s.ownerDocument.defaultView, c = win.getComputedStyle(s);
+  is(s.classList.contains('subtitle') && !s.classList.contains('muted'), true,
+     name + ': carries .subtitle and not .muted');
+  is(/^"?JetBrains Mono/.test(c.fontFamily), true, name + ': subtitle in JetBrains Mono');
+  is(c.fontWeight, '500', name + ': at weight 500');
+  is(c.fontSize, '12px', name + ': at 12px');
+  is(Math.abs(parseFloat(c.letterSpacing) - 12 * 0.08) < 0.05, true, name + ': tracked .08em');
+  is(c.textTransform, 'uppercase', name + ': in capitals, drawn by CSS');
+  const probe = s.ownerDocument.createElement('span');
+  probe.style.color = 'var(--muted)';
+  s.ownerDocument.body.appendChild(probe);
+  is(c.color, win.getComputedStyle(probe).color, name + ': in --muted');
+  probe.remove();
+  is(c.whiteSpace === 'normal' && c.textOverflow !== 'ellipsis', true, name + ': wraps and never ellipsises');
+};
 
 /* `settle()` is separate from `ready()`, and that is the whole reason this reads correctly.
    Headless virtual time does not run a transition or a keyframe faithfully, so geometry has to be
@@ -177,9 +207,12 @@ KG BARU · 2.1 km"></button>
     <button class="icon dots" popovertarget="probemenu"></button>
     <div class="menu" id="probemenu" popover></div>
     <div class="popname" data-go="1">SUNGAI DAMANSARA DI TTDI JAYA</div>
-    <div class="muted">Shah Alam, Selangor</div>
-    <div class="badges"><span class="badge" style="--c:var(--k-river)"
-      ><i class="i i-water_drop"></i>Water level</span></div>
+    <div class="subtitle">Shah Alam, Selangor</div>
+    <div class="kindrow subtitle"><span class="kg" role="img" aria-label="Water level"
+      data-tip="Water level" style="--c:var(--k-river)"><i class="i i-water_drop" aria-hidden="true"></i
+      ></span><span class="kg" role="img" aria-label="Siren ×2" data-tip="Siren ×2"
+      style="--c:var(--k-siren)"><i class="i i-campaign" aria-hidden="true"></i
+      ><span aria-hidden="true">×2</span></span></div>
   </div>
   <details class="sensor" data-sensor="a" open>
     <summary class="sensorhead">
@@ -774,7 +807,8 @@ async function phone() {
     if (h2) {
       is(Math.round(r(h2).top) >= Math.round(r(x).bottom), true,
          id + ': the headline sits on the row under the icons');
-      is(cs(h2).fontSize, '28px', id + ': at headline-medium, the rung the pane takes');
+      is(cs(h2).fontSize, '20px', id + ': at the phone title size, 20px (Phase 1.2)');
+      titleFace(h2, id);
       is(Math.round(r(h2).left) <= 20, true,
          id + ': starting on the pane padding rather than beside a button that is no longer there');
     }
@@ -927,11 +961,23 @@ async function desktop() {
     is(b.textContent.trim() === b.textContent.trim().toUpperCase(), false,
        id + ': while the markup keeps sentence case for a screen reader');
     const probe = d.createElement('span');
-    probe.style.color = variant === 'primary' ? 'var(--accent-fill)' : 'var(--md-sys-color-inverse-surface)';
     b.parentNode.appendChild(probe);
-    if (!b.disabled && !b.matches(':hover'))
-      is(cs(b).backgroundColor, cs(probe).color,
-         id + ': fills with ' + (variant === 'primary' ? '--accent-fill' : 'the inverse surface'));
+    /* **An outlined button has no fill**, since Phase 1.2. It states a 1px outline in the outline
+       role and ink text in `on-surface`, and never the accent, because volt is the act beside it. */
+    if (variant === 'outlined') {
+      probe.style.color = 'var(--md-sys-color-outline)';
+      is(cs(b).borderTopWidth, '1px', id + ': a 1px outline');
+      is(cs(b).borderTopColor, cs(probe).color, id + ': in the outline role');
+      probe.style.color = 'var(--md-sys-color-on-surface)';
+      is(cs(b).color, cs(probe).color, id + ': with ink text, never the accent');
+      if (!b.matches(':hover'))
+        is(cs(b).backgroundColor, 'rgba(0, 0, 0, 0)', id + ': and no fill');
+    } else {
+      probe.style.color = variant === 'primary' ? 'var(--accent-fill)' : 'var(--md-sys-color-inverse-surface)';
+      if (!b.disabled && !b.matches(':hover'))
+        is(cs(b).backgroundColor, cs(probe).color,
+           id + ': fills with ' + (variant === 'primary' ? '--accent-fill' : 'the inverse surface'));
+    }
     probe.remove();
   };
 
@@ -948,6 +994,26 @@ async function desktop() {
     is(cs(a).textDecorationLine, 'underline', 'links: and keeps its underline');
     probe.remove();
   }
+  /* Phase 1.2: the titles a reader meets outside the pane's own app bar. A closed dialog still
+     computes its font, so none needs opening here. */
+  titleFace(d.querySelector('#narrowBox h2'), 'narrow block');
+  titleFace(d.getElementById('lbTitle'), 'lightbox');
+  /* The lightbox's place line sits INSIDE its title, so it inherits Archivo, 800 and 125% from it.
+     `js/ui.js` writes it on open. A stand-in with the same classes reads the cascade without opening
+     a camera. */
+  {
+    const lw = d.createElement('span');
+    lw.className = 'lbwhere subtitle';
+    lw.textContent = 'Petaling, Selangor';
+    d.getElementById('lbTitle').append(lw);
+    subtitleFace(lw, 'lightbox place line');
+    is(cs(lw).fontStretch, '100%', 'lightbox place line: not stretched by the title around it');
+    lw.remove();
+  }
+  titleFace(d.querySelector('#aboutBox .docbody h3'), 'About section heading');
+  titleFace(d.querySelector('#dataBox .apflex h2'), 'All stations');
+  titleFace(d.querySelector('#camBox .apflex h2'), 'All cameras');
+  titleFace(d.getElementById('settingsTitle'), 'Settings');
 
   // --- motion, read BEFORE the override ---
   /* **The map card resizes on a transition, and that is the whole of the pane's arrival on screen.**
@@ -1635,37 +1701,32 @@ async function desktop() {
      the region and the kind chips always were that. `.pophead` is left holding nothing, so
      `openSide()` removes it — the fourth assertion is the one that catches a template still
      leaving something behind in a box nothing styles any more. */
-  is(!!d.getElementById('sideSub').querySelector('.muted'), true,
+  is(!!d.getElementById('sideSub').querySelector('.subtitle'), true,
      'the region line becomes the app bar supporting text');
-  is(!!d.querySelector('#sideBody .pophead > .muted'), false, 'and it is not left in the body too');
+  is(!!d.querySelector('#sideBody .pophead > :is(.muted, .subtitle)'), false, 'and it is not left in the body too');
   const sk = d.getElementById('sideKinds');
-  is(!!sk.querySelector('.badges'), true, 'the kind chips become its second supporting line');
+  is(!!sk.querySelector(':scope > .kindrow'), true, 'the kind glyphs become its second supporting line');
   is(!!d.querySelector('#sideBody .pophead'), false, 'and the emptied seam is removed, not left');
-  /* **A mast emits a `.badges` box and a single-sensor card emits one bare `.badge`.** The lift
-     names both, and only the box shape is in the fixture above. So the bare one is driven here.
-     A selector that lost it would leave every node card's kind in a box nothing styles any more. */
-  await inFrame(d, drive("openSide('probe-one', "
-    + JSON.stringify(CARD.replace(/<div class="badges">([^]*?)<\/div>/, '$1')) + ");"));
-  is(!!d.getElementById('sideKinds').querySelector(':scope > .badge'), true,
-     'a single-sensor card lifts its bare chip too, not only a mast box');
-  await inFrame(d, OPEN_CARD());
-  /* --- each chip is an M3 ASSIST CHIP ---
-     Transcribed from Chip/chip.css: a 32dp container, `shape-corner-small` (8dp), a 1dp outline,
-     `label-large`, and an 18dp leading icon. The label takes `on-surface` and the icon takes the
-     accent role, which here is the station kind's own hue. **The kind hue on the label is the
-     fault to guard**: a chip whose text is painted by the station kind reads as a status, and this
-     app reserves that reading for the traffic-light ladder alone. */
-  const chip = sk.querySelector('.badge');
-  is(Math.round(r(chip).height), 32, 'M3 assist chip: a 32dp container');
-  is(cs(chip).borderTopLeftRadius, '8px', 'at shape-corner-small');
-  is(cs(chip).borderTopWidth, '1px', 'with a 1dp outline, which is what makes it assist and not filled');
-  is(cs(chip).padding, '0px 16px 0px 8px', 'at M3 padding: 8dp behind the icon, 16dp past the label');
-  is(cs(chip).fontSize, '14px', 'label-large');
-  is(cs(chip).fontWeight, '500', 'at its own weight');
-  is(cs(chip).textTransform, 'none', 'and not the badge uppercase it replaced');
-  is(cs(chip).color, cs(d.body).color, 'the label is on-surface, never the station kind');
-  is(cs(chip.querySelector('.i')).fontSize, '18px', 'an 18dp leading icon');
-  is(cs(chip.querySelector('.i')).color !== cs(chip).color, true, 'which is the one thing that takes the kind hue');
+  /* --- the kind line is GLYPHS, since 2026-11-27 (MIGRATION.md Phase 1.2) ---
+     The owner cut the chips and kept each kind's glyph in its own hue, with `×2` where a kind
+     repeats, in the subtitle face. A glyph alone names nothing to a screen reader, so each one is
+     `role="img"` with the kind's name, and `data-tip` shows the words on hover and on tap. */
+  is(sk.querySelector('.badge'), null, 'no kind chip is left in the app bar');
+  const row = sk.querySelector('.kindrow');
+  subtitleFace(row, 'kind line');
+  const kgs = [...row.querySelectorAll('.kg')];
+  is(kgs.every(g => g.getAttribute('role') === 'img' && g.getAttribute('aria-label') === g.dataset.tip), true,
+     'kind line: each glyph is an image named for its kind, and its tip says the same words');
+  is(cs(kgs[0].querySelector('.i')).fontSize, '18px', 'kind line: an 18px glyph');
+  {
+    const probe = d.createElement('span');
+    probe.style.color = 'var(--k-river)';
+    sk.appendChild(probe);
+    is(cs(kgs[0].querySelector('.i')).color, cs(probe).color, 'kind line: the glyph takes its kind hue');
+    probe.remove();
+  }
+  is(cs(kgs[1].lastElementChild).color, cs(row).color, 'kind line: the ×2 is the subtitle ink, never the kind hue');
+  is(Math.round(r(kgs[1]).top), Math.round(r(kgs[0]).top), 'kind line: the glyphs share one line');
   const top = sh.querySelector('.apptop'), flex = sh.querySelector('.apflex');
   is(Math.round(r(sh).height) >= 112, true, 'M3 112dp medium flexible app bar');
   is(Math.round(r(top).height) >= 56, true, 'a 56px top row for the icons');
@@ -1675,21 +1736,16 @@ async function desktop() {
   is(cs(flex).padding, '0px 16px 12px', 'at M3 __flex-content padding');
   is(cs(flex).justifyContent, 'flex-end', 'bottom aligned, which is what puts the name on the seam');
   is(cs(flex).rowGap, '4px', 'and the medium variant gap between the two lines');
-  is(cs(st.querySelector('.popname')).fontSize, '28px', 'headline-medium');
-  is(cs(st.querySelector('.popname')).lineHeight, '36px', 'at its own line height');
+  /* **The title is in the brand face since 2026-11-27 (MIGRATION.md Phase 1.2)**, at 22px over a
+     28px line. `headline-medium`'s 28px put eleven Archivo Expanded capitals on a 360px line. */
+  is(cs(st.querySelector('.popname')).fontSize, '22px', 'the title size, 22px above 600px');
+  is(cs(st.querySelector('.popname')).lineHeight, '28px', 'at its own line height');
+  titleFace(st.querySelector('.popname'), 'the station title');
   is(cs(st.querySelector('.popname')).color, cs(d.body).color,
      'in on-surface: an app bar headline names the screen, where a side sheet title labels a panel');
-  const sub2 = d.querySelector('#sideSub .muted');
-  is(cs(sub2).fontSize, '14px', 'the supporting text is body-medium');
-  is(cs(sub2).fontWeight, '500', 'at the weight M3 states for it');
-  // Against a probe: it settles the token through the same engine, this file's rule for a colour.
-  {
-    const p = d.createElement('span');
-    p.style.color = 'var(--md-sys-color-on-surface-variant)';
-    d.body.appendChild(p);
-    is(cs(sub2).color, cs(p).color, 'in on-surface-variant');
-    p.remove();
-  }
+  /* The supporting text was `body-medium`. It is the brand `.subtitle` since Phase 1.2, and
+     `subtitleFace()` reads its colour off `--muted` through a probe. */
+  subtitleFace(d.querySelector('#sideSub .subtitle'), 'the station region line');
   is(cs(sc2).position, 'static', 'the button is a flex item, so nothing floats and nothing is padded');
   /* **Leading at THIS width too, and that is the change.** It was a trailing close X above 600px and
      a leading one below it, moved by `order: -1`. M3 gives a top app bar a leading navigation icon,
@@ -2180,13 +2236,15 @@ async function desktop() {
     is(trail.hasAttribute('data-tip'), true, 'settings list: its words ride data-tip, never title');
     is(trail.hasAttribute('title'), false, 'settings list: and never a title, which a phone cannot open');
 
-    /* **The clear action is a brand button under the list, since 2026-11-27 (brand R1.1).** It was
-       a one-row list of its own. `render.js` owns the list's `innerHTML`, so the button sits in a
-       `.btnrow` beside it rather than inside it. */
+    /* **The clear action is the subpage's last row again, since 2026-11-27 (MIGRATION.md Phase
+       1.2).** Brand R1.1 made it a brand button for one day. `render.js` owns the list's
+       `innerHTML`, so the action is a one-row list of its own, directly under the list. */
     const foot = list.nextElementSibling;
-    is(foot?.classList.contains('btnrow') && foot.contains(d.getElementById('favClear')), true,
-       'settings list: its action is a button row under the list');
-    brandBtn('favClear', 'secondary');
+    is(foot?.contains(d.getElementById('favClear')), true, 'settings list: its action is the page’s last row');
+    is(!!d.getElementById('favClear')?.classList.contains('mrow'), true,
+       'settings list: and a row-filling action, never a brand button');
+    is(d.querySelector('#settingsBox .btn, #settingsBox .btnrow'), null,
+       'settings: no brand button and no `.btnrow` anywhere in this pane (Phase 1.2)');
     is(d.querySelector('#settingsBox .rowbtns'), null, 'settings: no `.rowbtns` left in this pane');
     // Back to the main page, where the groups below are measured.
     d.getElementById('settingsBack').click();
@@ -2196,10 +2254,8 @@ async function desktop() {
     const rows = [...dev.children];
     // The row's own class first: `.readout` carries the readings TABLE, which has an id of its own.
     is(rows.map(x => x.className || x.querySelector('[id]')?.id).join(','),
-       'testMode,devReadings,devRaw',
-       'developer: the reader’s own order — switch, readings, raw, then the two buttons under it');
-    is([...dev.nextElementSibling.children].map(b2 => b2.id).join(','), 'devForce,devReset',
-       'developer: Refresh now, then Reset settings, as buttons under the list');
+       'testMode,devReadings,devForce,devRaw,devReset',
+       'developer: the reader’s own order — switch, readings, refresh, raw, reset');
     /* **M3's switch.** Track 52x32 with a 2px border, thumb 16px off and 24px on, in a 48x68 target.
        The amber `.testtog` pill is gone. */
     const sw = dev.querySelector('.msw'), track = sw.querySelector('.mswtrack');
@@ -2235,17 +2291,15 @@ async function desktop() {
     is(ro.querySelector('button, a'), null, 'developer: the readings row holds no control');
     is(cs(ro).cursor, 'default', 'developer: so nothing about it invites a tap');
     is(!!ro.querySelector('#devstats'), true, 'developer: and it is where the readings table lives');
-    /* Raw payload is a link, so it stays an M3 list ACTION row. The two buttons are brand buttons,
-       and neither is a primary, because Settings has no one main act (MIGRATION.md Phase 5b). */
-    {
-      const btn = d.getElementById('devRaw');
-      is(btn.classList.contains('mrow'), true, 'devRaw: is a row-filling action, not a pill');
+    /* The three actions are M3 list ACTION rows: a button that fills the item. Brand R1.1 made two
+       of them brand buttons for one day, and Phase 1.2 put the rows back. */
+    for (const id of ['devForce', 'devRaw', 'devReset']) {
+      const btn = d.getElementById(id);
+      is(btn.classList.contains('mrow'), true, id + ': is a row-filling action, not a pill');
       is(Math.round(r(btn).width), Math.round(r(btn.closest('li')).width),
-         'devRaw: and fills its own container, so the row is the target');
-      is(cs(btn).cursor, 'pointer', 'devRaw: which a pressable row states');
+         id + ': and fills its own container, so the row is the target');
+      is(cs(btn).cursor, 'pointer', id + ': which a pressable row states');
     }
-    for (const id of ['devForce', 'devReset']) brandBtn(id, 'secondary');
-    is(sb.querySelector('.btn.primary'), null, 'settings: no primary button, since no act here is the main one');
 
     /* --- Notifications, on the repository owner's instruction of 2026-11-04 ---
        A subpage, opened by one row of the Alerts group. One master, four thresholds, then a test row,
@@ -2262,15 +2316,15 @@ async function desktop() {
     is(pl.hidden, false, 'notifications: the subpage shows');
     is(d.getElementById('settingsTitle').textContent, 'Notifications', 'notifications: under its own title');
     is([...pl.querySelectorAll('li')].map(x => x.querySelector('input, button')?.id).join(','),
-       'pushOn,pushFavWarn,pushFavDanger,pushAnyWarn,pushAnyDanger',
-       'notifications: master, then four thresholds');
-    is([...pl.querySelectorAll('ul')].map(u => u.children.length).join(','), '1,4',
-       'notifications: in two groups, so the master stands apart from the thresholds');
+       'pushOn,pushFavWarn,pushFavDanger,pushAnyWarn,pushAnyDanger,pushTest',
+       'notifications: master, four thresholds, then the test row');
+    is([...pl.querySelectorAll('ul')].map(u => u.children.length).join(','), '1,4,1',
+       'notifications: in three groups, so the master and the test stand apart from the thresholds');
     is(pl.querySelectorAll('.msw').length, 5, 'notifications: five M3 switches');
-    is(pl.lastElementChild.classList.contains('btnrow')
-       && pl.lastElementChild.contains(d.getElementById('pushTest')), true,
-       'notifications: the test is a button under the last group');
-    brandBtn('pushTest', 'secondary');
+    is(d.getElementById('pushTest').closest('li').querySelector('.msw'), null,
+       'notifications: the test row is an action and holds no switch');
+    is(d.getElementById('pushTest').classList.contains('mrow'), true,
+       'notifications: the test row is a row-filling action');
     is(['pushOn', 'pushFavWarn', 'pushFavDanger', 'pushAnyWarn', 'pushAnyDanger']
          .every(id => d.getElementById(id).checked === false), true,
        'notifications: all five default to off, so nothing can be on at install');
@@ -2333,18 +2387,23 @@ async function desktop() {
     is(cs(foot).gap, '8px', 'reset: at M3’s 8px between them');
     is([...foot.children].map(b2 => b2.id).join(','), 'confirmNo,confirmYes',
        'reset: Cancel first, the destructive answer last, which is M3’s order');
-    /* **Brand buttons since 2026-11-27 (R1.1).** Cancel is the secondary and the act is the one
-       primary. A destructive act stays volt and never takes a status red. */
-    brandBtn('confirmNo', 'secondary');
+    /* **Brand buttons since 2026-11-27.** Cancel is outlined since Phase 1.2, and the act is the
+       one primary. A destructive act stays volt and never takes a status red. */
+    brandBtn('confirmNo', 'outlined');
+    is(/Archivo/.test(cs(d.getElementById('confirmTitle')).fontFamily)
+       && cs(d.getElementById('confirmTitle')).textTransform, 'uppercase',
+       'reset: its title is in the brand face, in capitals (Phase 1.2)');
     brandBtn('confirmYes', 'primary');
     is(Math.round(r(d.getElementById('confirmNo')).top), Math.round(r(d.getElementById('confirmYes')).top),
        'reset: the two buttons stay on one line');
     // The splash is gone by now, so its button is asserted as markup alone.
     is(d.getElementById('splashRetry').className, 'btn primary', 'splash: Try again is the card’s one primary');
     is(d.querySelector('.mtext, .tbtn, .link'), null, 'buttons: no `.mtext`, `.tbtn` or `.link` left');
+    /* The title size, not `headline-small`, since Phase 1.2. Archivo Expanded capitals at 24px take
+       half a 312px dialog for `Remove all favorites?`. */
     is(cs(cb.querySelector('.mdlgtitle')).fontSize,
-       cs(d.documentElement).getPropertyValue('--md-sys-typescale-headline-small-size').trim(),
-       'reset: the headline at headline-small');
+       cs(d.documentElement).getPropertyValue('--title-size').trim(),
+       'reset: the headline at the title size');
     /* Cancel must change nothing. This is the one assertion that would notice a wired-up Reset on
        the wrong button, and that mistake wipes every preference a reader has. */
     const before = w.localStorage.getItem('prefs');
@@ -2968,9 +3027,8 @@ async function searchBar(frame, label) {
   }
 }
 
-/* **The count is M3's list subheader**, the component the alert panel, the Notices pane and
-   Settings already draw: `title-small` in `on-surface-variant`, 48dp, at the pane's own inset. One
-   panel states one heading style. */
+/* **The count is the brand `.subtitle` since 2026-11-27 (MIGRATION.md Phase 1.2).** It was M3's
+   list subheader, `title-small`. It keeps that component's 48dp box at the pane's own inset. */
 async function countLine() {
   const { d, cs, r, settle } = await ready('desk');
   say('--- the count line -------------------------------------------------------');
@@ -2980,30 +3038,14 @@ async function countLine() {
     b.showModal();
     const p = d.getElementById(id);
     p.textContent = '450 stations';
-    const st = cs(p);
-    const root = cs(d.documentElement);
-    is(st.fontSize, root.getPropertyValue('--md-sys-typescale-title-small-size').trim(),
-       id + ': title-small');
     is(Math.round(r(p).height), 48, id + ': 48dp');
-    /* **The size alone cannot tell one scale from another here.** `title-small`, `label-large` and
-       `body-medium` are all 14px in the vendored token set. So assert the two properties that
-       actually change: this line was 12px `.muted` with no height, and every old table heading in
-       this app was uppercase and letter-spaced.
-       **The tracking is read off the token, never asserted as `normal`.** `title-small` carries a
-       real tracking value, `0.1px`. Asserting `normal` would pass only while the rule omits it.
-       **Compared as a number, through `px()`.** A custom property keeps its value as written, and
-       the build minifies `0.1px` to `.1px`. The computed `letter-spacing` reads `0.1px` either way,
-       so a text comparison failed on the build with nothing wrong on screen. */
-    is(st.textTransform, 'none', id + ': sentence case');
-    is(px(st.letterSpacing), px(root.getPropertyValue('--md-sys-typescale-title-small-tracking')),
-       id + ': and the title-small tracking');
-    /* `on-surface-variant`, which this app bridges onto `--muted`. Compare against a probe carrying
-       the token, never against a hex: the palette has moved four times and every copy went stale. */
-    const probe = d.createElement('span');
-    probe.style.color = root.getPropertyValue('--muted').trim();
-    d.body.appendChild(probe);
-    is(st.color, cs(probe).color, id + ': in on-surface-variant');
-    probe.remove();
+    /* **The brand `.subtitle` since Phase 1.2**, and it was M3's `title-small` list subheader. The
+       id rule that holds the 48dp box must state no face, or two ids beat the class. A long count
+       wraps inside the row, which grows past 48dp. */
+    subtitleFace(p, id);
+    p.textContent = 'Sensors at locations · '.repeat(12);
+    is(Math.round(r(p).height) > 48 && p.scrollWidth <= p.clientWidth + 1, true,
+       id + ': a long line wraps and grows the row rather than running past it');
     b.close();
   }
 }
