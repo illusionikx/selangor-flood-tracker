@@ -212,7 +212,8 @@ stays sentence case in the markup (screen readers read words, not shouting); hov
 
 **Treading carefully: the guardrails**
 
-1. **One primary per surface.** Never two volt buttons side by side. The confirm dialog is primary + text.
+1. **One primary per surface.** Never two volt buttons side by side. The confirm dialog is primary + secondary
+   (changed 2026-11-27 in R1.1: Cancel is `.btn.secondary`, not `.btn.text`).
 2. **Never a status colour.** A destructive confirm stays volt and names the act (“Remove all”), as `ask()` already
    requires. Red stays the map's.
 3. **Short labels.** Two words, about 14 characters. Archivo capitals are wide: “SHOW ON MAP” at 13px is about
@@ -233,7 +234,7 @@ stays sentence case in the markup (screen readers read words, not shouting); hov
 | `index.html` 262 | Splash “Try again” → `.btn.primary` (on the white warning card, never on volt). |
 | `index.html` 855–856 | The two confirm buttons. |
 | `js/alerts.js` 53 | `class="tbtn"` → `class="btn text"`. |
-| Settings developer rows | Stay M3 list action rows; not buttons. |
+| Settings action buttons | Changed 2026-11-27 in R1.1. Refresh now, Reset settings, Remove all favorites, Stop ignoring all and the notification test are `.btn.secondary` in a `.btnrow` under their list. Raw payload is a link and stays a list row. |
 
 **Docs and checks.** `CLAUDE.md`'s writing standard says sentence case for every rendered string and lists the
 ALL-CAPS blocks as the exception; add buttons to that exception, noting the caps are CSS only. `m3-check.html`

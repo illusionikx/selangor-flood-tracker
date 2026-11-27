@@ -724,8 +724,10 @@ clicks whatever you do with them. So the third of any fast burst is a triple-cli
   `[hidden]` attribute too. `.link { display: flex }` in `base.css` beats the browser's own
   `[hidden] { display: none }`. So the Developer section's "Refresh now" button needed a
   `display: none` rule of its own to actually disappear. That button is hidden on the GitHub Pages
-  build, where the query it needs does nothing. `js/ui.js` hides its whole `<li>` now, which is a
-  plain `<li>` with no author `display`, so the trap does not reach it.
+  build, where the query it needs does nothing. Since 2026-11-27 the button is a `.btn` under the
+  Developer list, and `.btn { display: inline-flex }` has the same trap. `.btn[hidden]` in
+  `css/base.css` states `display: none` again, and `js/ui.js` hides the button itself. Any new class
+  that sets `display` on a control that a script hides needs the same line. `.link` is deleted.
 - **Every `<dialog>` in this app is one of three kinds, and a bare `.modalhead` selector broke two
   of them.** `#dataBox`, `#camBox` and the two `.docbox` panes are **full-screen** below 600px and
   **basic** above it. `#lightbox` and `#warnBox` are **basic at every width**. `#eggBox` and

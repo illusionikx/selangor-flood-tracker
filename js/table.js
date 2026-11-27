@@ -388,16 +388,16 @@ function cell(own, lead, scope = '') {
     // `color()`, so the pill, the pin and the card cannot disagree about one gauge. It also carries
     // `raining()`: a gauge whose own odometer denies its reading drops back to the kind violet.
     const st = Math.max(0, m.status);
-    return wrap(`${pill(RAIN[st] || RAIN[0], color(m), hook)}<div class="val">${
-      m.hourly} mm<span class="muted">/h</span></div>`);
+    return wrap(`${pill(RAIN[st] || RAIN[0], color(m), hook)}<div class="val"><span class="num">${
+      m.hourly} mm</span><span class="muted">/h</span></div>`);
   }
   // Gauge: depth over a flood-prone spot, so negative is dry ground, not a missing reading.
   // Word comes from the popup's own gaugeState(), so a pin and its row can never say different
   // things about the same status.
   const [, , label] = gaugeState(m);
   return wrap(`${pill(label, gaugeColor(m), hook)}<div class="val">${
-    m.depth > 0 ? `${m.depth} m<span class="muted"> deep</span>`
-                : `<span class="muted">${Math.abs(m.depth)} m below</span>`}</div>`);
+    m.depth > 0 ? `<span class="num">${m.depth} m</span><span class="muted"> deep</span>`
+                : `<span class="muted"><span class="num">${Math.abs(m.depth)} m</span> below</span>`}</div>`);
 }
 
 /* CSS anchor positioning would do this, but it is Chromium-only — so the panel is placed by hand on

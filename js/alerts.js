@@ -50,7 +50,7 @@ const build = () => {
     tabBtn('sensors', 'Sensors', parts.ns)}${tabBtn('notices', 'Notices', parts.nn)
   }</div><div class="apane" role="tabpanel">${tab === 'sensors' ? parts.chips || '' : ''}${
     body.includes('data-sec=')
-    ? '<div class="abulk"><button class="tbtn" data-bulk></button></div>' : ''}${
+    ? '<div class="abulk"><button class="btn text" data-bulk></button></div>' : ''}${
     body || '<p class="empty muted">No notices.</p>'}</div>`;
 };
 
@@ -168,21 +168,25 @@ function reading(s, t) {
   if (s.kind === 'rainfall') {
     if (s.hourly == null) return '';
     const when = t === 'stale' ? noSec(s.updated) || '' : '';
-    return `<b class="rd">${s.hourly} mm/h${
-      when ? `<br><small class="muted">${when}</small>` : ''}</b>`;
+    return `<b class="rd"><span class="num">${s.hourly} mm/h</span>${
+      when ? `<br><small class="muted num">${when}</small>` : ''}</b>`;
   }
   // A flood gauge states the depth of water over the spot. It has no level and no forecast.
   if (s.kind === 'gauge') {
     if (s.depth == null) return '';
     const when = t === 'stale' ? noSec(s.updated) || '' : '';
-    return `<b class="rd">${s.depth} m${when ? `<br><small class="muted">${when}</small>` : ''}</b>`;
+    return `<b class="rd"><span class="num">${s.depth} m</span>${
+      when ? `<br><small class="muted num">${when}</small>` : ''}</b>`;
   }
   if (s.level == null) return '';
   const max = s.danger || s.warning || s.alert;
-  const under = t === 'stale' ? noSec(s.updated) || ''
+  // The stamp and the percentage take the mono face. The ETA is words and stays in the UI face.
+  const seen = t === 'stale' ? noSec(s.updated) : '';
+  const under = t === 'stale' ? (seen ? `<span class="num">${seen}</span>` : '')
     : t === 'soon' && s.eta != null ? etaText(s.eta)
-    : max ? `${(s.level / max * 100).toFixed(0)}% of danger` : '';
-  return `<b class="rd">${s.level} m${under ? `<br><small class="muted">${under}</small>` : ''}</b>`;
+    : max ? `<span class="num">${(s.level / max * 100).toFixed(0)}%</span> of danger` : '';
+  return `<b class="rd"><span class="num">${s.level} m</span>${
+    under ? `<br><small class="muted">${under}</small>` : ''}</b>`;
 }
 
 function groupCard(items, kind, t, hereAt) {

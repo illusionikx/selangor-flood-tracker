@@ -21403,3 +21403,36 @@ The app now wears the Flood Watch identity from `branding/`. The rule is calm UI
 
 **Not built.** The dome core and the whole-reach disc stay in the preview only. The owner judged the dome invisible on the map, because the top band covers only the top 10% of the value.
 
+## Brand audit R1.1: fonts, links, buttons and readings (2026-11-27)
+
+A brand audit after release R1 found four gaps between `branding/` and the app. This release closes them. It is MIGRATION.md Phase 5b and Phase 6, which R1 left for later.
+
+**What changed.**
+- Form controls inherit the page font. `button, input, select, textarea { font: inherit; }` is in `css/base.css`. Before, every button and chip computed Arial at 13.33px under a Roboto body.
+- A link in prose takes `--accent`, underlined, on both themes. The rule covers every `.docbox` and `#warnBox`, and it skips a link that is a control (`.mrow`, `.btn`). Before, About showed the browser's own `#0000EE` and `#9E9EFF`.
+- The brand button is in `css/base.css`: `.btn`, `.btn.primary`, `.btn.secondary` and `.btn.text`. It is 48px tall, on a 12px corner, in Archivo Expanded 800 at 13px. The capitals come from CSS, and the markup keeps sentence case. Hover and press use M3's state opacities. Disabled uses M3's 38% and 12% pair.
+- The confirm dialog: Cancel is `.btn.secondary` and the act is `.btn.primary`. The splash "Try again" is `.btn.primary` on the white card. The alert list's Collapse all is `.btn.text`.
+- Settings: Refresh now, Reset settings, Remove all favorites, Stop ignoring all and the notification test are `.btn.secondary`. Each one left its one-row list and sits in a `.btnrow` under the list it acts on. Below 600px a button fills the width. Raw payload is a link, so it stays a list row.
+- `.link`, `.mtext` and `.tbtn` are deleted. Nothing else used them.
+- Readings are in JetBrains Mono with tabular figures. That covers a level, a depth, a rain rate, a threshold, a rain total, a percentage of danger, a temperature, a clock stamp and a graph axis label. It reaches the station card, the meter, the graphs, the hover tip, the table, the table's hover panel, the alert list, the notices list, the weather card and the ticker. Names and words stay in Roboto.
+
+**How the mono face finds a reading.** Most readings share an element with words, for example `41% of danger` or `flooded · 0.12 m`. No CSS selector can split a text node. So the templates wrap the figure in `<span class="num">`, and the words stay outside it. One rule in `css/base.css` sets `.num` and a short list of elements that hold a figure alone. The unit stays with its figure, because `1.74 m` is one token to a reader. `js/sparktip.js` sets `num` on the hover tip only when the text starts with a digit, so a control label stays in Roboto. `wxWhen()` sets it only on a bare clock time, so `Until 19:30` stays in Roboto. An axis label of `now` and the rain total label `Today` stay in Roboto.
+
+**Decisions taken against MIGRATION.md, by the owner on 2026-11-27.**
+- Cancel is a secondary button, not a text button. MIGRATION.md said primary and text.
+- The Settings actions are brand buttons. MIGRATION.md said they stay M3 list action rows. The owner chose a button under each list over a restyled row, so a segmented list holds no filled bar.
+- MIGRATION.md is updated to match.
+
+**Trade-offs accepted.**
+- A button is 48px against M3's 40px. The dialog footer and the alert list are 8px taller.
+- The flood gauge's scale labels now read figure over word, `0.15` over `warning`, the same as a river's. They read `warning 0.15` before. The `<b>` that holds the figure is what the mono rule reaches.
+- "Send a test notification" is now "Send a test". MIGRATION.md asks for short labels, and Archivo capitals are wide. The heading of the page already says Notifications.
+- JetBrains Mono is wider than Roboto at the same size. The table's name column and its `min-width` (220px and 820px, 160px and 760px below 600px) are unchanged. The sensor columns are a fixed 120px, and `m3-check.html` and `paint-check.html` found no overflow. Nobody measured the widest live reading by hand.
+
+**Not built.**
+- The camera stamps stay in Roboto: `.btime`, `.abtime`, `.tlpeek` and `.clipcap`. They mix weekday and month names into the stamp, and `js/timeline.js` sizes the pill from widths measured in Roboto. They need their own pass.
+- A distance (`2.1 km`) and a location accuracy (`±12 m`) stay in Roboto. They are not readings.
+- An ETA (`in ~2.0 h`) stays in Roboto, because it is words around a figure that the card does not split.
+
+**Checks.** `m3-check.html` gains `brandBtn()`, which asserts the class, the 48px height, the 12px corner, the capitals, Archivo, sentence-case markup and the fill token on each button. It also asserts that a chip and a plain button compute Roboto, and that an About link takes `--accent` with an underline. The Settings assertions now expect the buttons under the lists. All six render checks pass on the source and on the build, except three m3-check lines that read `flow-end` where they want `flex-end`. Those three fail on main too. Chrome 158 reports `justify-content` and `align-items` with the new keyword.
+

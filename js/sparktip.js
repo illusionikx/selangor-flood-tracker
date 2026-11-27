@@ -81,7 +81,7 @@ function show(e) {
       || lab.getAttribute('aria-label') || '';
     t.textContent = lab.dataset.key && FINE.matches ? `${name} (${lab.dataset.key})` : name;
     t.style.color = '';
-    t.classList.remove('warn');
+    t.classList.remove('warn', 'num');   // a label is words, so it stays in the UI face
     if (!t.matches(':popover-open')) t.showPopover();
     const r = lab.getBoundingClientRect();
     return place(t, r, r.left + r.width / 2);
@@ -120,6 +120,8 @@ function show(e) {
   t.textContent = label;
   t.style.color = tone || '';
   t.classList.toggle('warn', !!warn);
+  // A reading and its stamp take the mono face. A siren's `Sounding · 14:20` leads with a word.
+  t.classList.toggle('num', /^-?\d/.test(label));
   if (!t.matches(':popover-open')) t.showPopover();
   place(t, r, r.left + at / 100 * r.width);   // over the crosshair
 }

@@ -905,7 +905,8 @@ order that file holds them. A trap names itself here, and the file states the ev
   `basin n/a` from 287 of 679 cards. That line stated a gap in the feed rather than a fact about the
   place. It sat beside `district n/a`, which no station can ever reach. The ALL-CAPS blocks (`TRIGGERED`,
   `HEAVY RAIN`, `HAPPENING NOW`) are a deliberate visual language and are **not** messages — leave
-  them.
+  them. A brand button (`.btn`) is in capitals too, since 2026-11-27. The capitals come from CSS
+  alone, and the markup keeps sentence case so a screen reader reads words.
 - All user settings live in one `prefs` blob in `localStorage` (`PREFS` + `save()`).
 - **The layer controls are a bare CHIP ROW over the map, and there is no panel left at all.**
   `#mapchips` sits on the map's leading edge, under the ticker, on the legend's own 12px line. A
